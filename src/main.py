@@ -28,17 +28,17 @@ USE_CPU = False
 CKTP = ''
 
 # Set seed for reproducibility
-def set_seed(seed=42):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+# def set_seed(seed=42):
+#     torch.manual_seed(seed)
+#     torch.cuda.manual_seed_all(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
+#     torch.backends.cudnn.deterministic = True
+#     torch.backends.cudnn.benchmark = False
 
 # Load MNIST dataset
 def create_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=28, num_workers=4):
-    set_seed(42)
+    # set_seed(42)
     preprocess = transforms.Compose([
         transforms.Resize(image_size),
         transforms.ToTensor(),
@@ -61,7 +61,6 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
     scheduler = OneCycleLR(optimizer, _lr, total_steps=epochs * len(train_loader), pct_start=0.25, anneal_strategy='cos')
     loss_fn = nn.MSELoss(reduction='mean')
     os.makedirs("data/train_epochs", exist_ok=True)
-    #load checkpoint
     if CKTP:
         cktp=torch.load(CKTP)
         model_ema.load_state_dict(cktp["model_ema"])
@@ -116,10 +115,11 @@ def obtain_predictions(model, test_loader, device="cuda"):
         with open(f"data/test_predictions/sample_{i}.txt", "w") as f:
             f.write(str(targets[i].item()))
     return predictions, targets
+
 # Evaluate model accuracy
 def eval_model(predictions, targets):
-    predictions = predictions.view(predictions.shape[0], -1)  # Flatten predictions
-    targets = targets.view(-1)  # Flatten targets
+    predictions = predictions.view(predictions.shape[0], -1)
+    targets = targets.view(-1) 
     diff = (predictions.argmax(dim=1) == targets).float()
     accuracy = diff.mean().item()
     print(f"Model Accuracy: {accuracy * 100:.2f}%")
@@ -128,7 +128,6 @@ def eval_model(predictions, targets):
 # Main execution
 def main():
     device = "cpu" if USE_CPU else "cuda"
-    print(f"Using device: {device}")
     
     # Load MNIST dataset
     train_loader, test_loader = create_mnist_dataloaders()

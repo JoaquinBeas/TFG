@@ -1,1 +1,4 @@
 /gtp_input.txt
+/mnist_data
+__pycache__
+/results

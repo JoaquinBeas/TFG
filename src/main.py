@@ -60,8 +60,7 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
     optimizer = AdamW(model.parameters(), lr=_lr)
     scheduler = OneCycleLR(optimizer, _lr, total_steps=epochs * len(train_loader), pct_start=0.25, anneal_strategy='cos')
     loss_fn = nn.MSELoss(reduction='mean')
-    os.makedirs("results", exist_ok=True)
-
+    os.makedirs("data/train_epochs", exist_ok=True)
     #load checkpoint
     if CKTP:
         cktp=torch.load(CKTP)
@@ -91,9 +90,9 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
                 "model_ema":model_ema.state_dict()} 
         model_ema.eval()
         samples = model_ema.module.sampling(N_SAMPLES, clipped_reverse_diffusion=True, device=device)
-        save_image(samples, f"results/epoch_{epoch+1}.png", nrow=int(math.sqrt(N_SAMPLES)), normalize=True)
+        save_image(samples, f"data/train_epochs/epoch_{epoch+1}.png", nrow=int(math.sqrt(N_SAMPLES)), normalize=True)
         
-        torch.save(ckpt, f"results/epoch_{epoch+1}.pt")
+        torch.save(ckpt, f"data/train_epochs/epoch_{epoch+1}.pt")
 
     return model
 
@@ -101,17 +100,26 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
 def obtain_predictions(model, test_loader, device="cuda"):
     model.eval()
     predictions, targets = [], []
+    os.makedirs("data/test_predictions", exist_ok=True)
     with torch.no_grad():
         for images, labels in test_loader:
             noise = torch.randn_like(images).to(device)
             images = images.to(device)
-            pred = model(images, noise)
-            predictions.append(pred.cpu())
+            pred = model.sampling(images.shape[0], device=device)
+            predictions.append(pred.detach().cpu())
+            targets.append(labels.detach().cpu())
             targets.append(labels.cpu())
-    return torch.cat(predictions, dim=0), torch.cat(targets, dim=0)
-
+    predictions = torch.cat(predictions, dim=0)
+    targets = torch.cat(targets, dim=0)
+    for i in range(min(10, predictions.shape[0])):
+        save_image(predictions[i], f"data/test_predictions/sample_{i}.png", normalize=True)
+        with open(f"data/test_predictions/sample_{i}.txt", "w") as f:
+            f.write(str(targets[i].item()))
+    return predictions, targets
 # Evaluate model accuracy
 def eval_model(predictions, targets):
+    predictions = predictions.view(predictions.shape[0], -1)  # Flatten predictions
+    targets = targets.view(-1)  # Flatten targets
     diff = (predictions.argmax(dim=1) == targets).float()
     accuracy = diff.mean().item()
     print(f"Model Accuracy: {accuracy * 100:.2f}%")
@@ -133,7 +141,6 @@ def main():
     print("Evaluating model...")
     predictions, targets = obtain_predictions(trained_model, test_loader, device=device)
     eval_model(predictions, targets)
-
 
 if __name__ == "__main__":
     main()

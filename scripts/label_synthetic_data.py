@@ -8,16 +8,14 @@ from models.mnist_teacher import MNISTDiffusion
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 SYNTHETIC_DIR = "data/synthetic"
 OUTPUT_DIR = "data/labeled_synthetic"
-MODEL_PATH = "data/train_epochs/epoch_100.pth"
+MODEL_PATH = "data/train_epochs/epoch_100.pt"
 
-# Cargar modelo maestro
 def load_teacher_model():
     model = MNISTDiffusion(image_size=28, in_channels=1).to(DEVICE)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE)["model"])
     model.eval()
     return model
 
-# Etiquetar imágenes sintéticas
 def label_synthetic_data():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     model = load_teacher_model()

@@ -1,19 +1,22 @@
+import sys
 import torch
 import os
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) # FIXME: hay que arreglar los paths, esto no puede estar asi
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 from models.mnist_teacher import MNISTDiffusion
 from torchvision.utils import save_image
 
 # Configuración
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 N_SAMPLES = 1000
-OUTPUT_DIR = "data/synthetic"
-MODEL_PATH = "data/train_epochs/epoch_100.pt"
+OUTPUT_DIR = "src/data/synthetic"
+MODEL_PATH = "src/data/train/teacher_epochs/epoch_40.pt" #TODO:hay que hacer que esto sea variable y que coja la ultima, o simplemente guardar la ultima y cojerla como tal
 
 # Generar imágenes sintéticas
 def generate_synthetic_data():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    model = MNISTDiffusion(image_size=28, in_channels=1).to(DEVICE)
+    model = MNISTDiffusion(image_size=28, in_channels=1, base_dim=64, dim_mults=[2, 4]).to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE)["model"])
     model.eval()
 

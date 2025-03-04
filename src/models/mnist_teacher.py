@@ -28,12 +28,12 @@ class MNISTDiffusion(nn.Module):
         self.in_channels = in_channels
         self.image_size = image_size
 
-        betas = self._cosine_variance_schedule(timesteps)  # todo Definir las betas
+        betas = self._cosine_variance_schedule(timesteps)  #  Definir las betas
 
         alphas = 1.0 - betas
         alphas_cumprod = torch.cumprod(
             alphas, dim=-1
-        )  # todo Cumprod es el producto acumulado de las betas
+        )  #TODO: Cumprod es el producto acumulado de las betas
 
         # Registro de buffers, permite que estos tensores se guarden junto con el modelo y se muevan al dispositivo correcto sin ser considerados parámetros entrenables.
         self.register_buffer("betas", betas)
@@ -65,7 +65,7 @@ class MNISTDiffusion(nn.Module):
 
     # Entradas:
     #   n_samples: Número de imágenes que se quieren generar.
-    # todo   clipped_reverse_diffusion (opcional): Flag que indica si se debe usar la reversión de difusión con clipping (limitar valores) o la versión estándar.
+    # TODO:   clipped_reverse_diffusion (opcional): Flag que indica si se debe usar la reversión de difusión con clipping (limitar valores) o la versión estándar.
     # Salidas:
     #   x_t: tensor final que representa la imagen generada
     @torch.no_grad()
@@ -88,7 +88,7 @@ class MNISTDiffusion(nn.Module):
 
     # Entradas:
     #    timesteps: Número de pasos de la difusión.
-    #    todo epsilon (opcional): Pequeño valor para ajustar la función coseno (por defecto 0.008).
+    #    TODO: epsilon (opcional): Pequeño valor para ajustar la función coseno (por defecto 0.008).
     # Salidas:
     #    betas: Tensor de varianzas para cada paso de la difusión.
     def _cosine_variance_schedule(self, timesteps, epsilon=0.008):

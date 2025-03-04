@@ -1,18 +1,23 @@
+import sys
 import torch
 import os
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))#TODO:
 from torchvision.transforms import ToTensor
 from PIL import Image
 from models.mnist_teacher import MNISTDiffusion
 
 # Configuración
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-SYNTHETIC_DIR = "data/synthetic"
-OUTPUT_DIR = "data/labeled_synthetic"
-MODEL_PATH = "data/train_epochs/epoch_100.pt"
+SYNTHETIC_DIR = "src/data/synthetic"
+OUTPUT_DIR = "src/data/labeled_synthetic"
+MODEL_PATH = "src/data/train/teacher_epochs/epoch_40.pt" #TODO:
 
 def load_teacher_model():
-    model = MNISTDiffusion(image_size=28, in_channels=1).to(DEVICE)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE)["model"])
+    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+    model_config = checkpoint.get("model_config", {"image_size": 28, "in_channels": 1, "base_dim": 64, "dim_mults": [2, 4]})
+    model = MNISTDiffusion(**model_config).to(DEVICE)
+    model.load_state_dict(checkpoint["model"])
     model.eval()
     return model
 

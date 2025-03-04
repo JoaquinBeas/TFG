@@ -2,7 +2,7 @@ import sys
 import torch
 import os
 import math
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..")) # FIXME: hay que arreglar los paths, esto no puede estar asi
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "src"))
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
@@ -16,7 +16,7 @@ from utils.exponential_moving_avg import ExponentialMovingAverage
 
 # Constants
 BATCH_SIZE = 128
-EPOCHS = 100
+EPOCHS = 40  # FIXME: modelo final poner 100
 LEARNING_RATE = 0.001
 MODEL_BASE_DIM = 64
 TIMESTEPS = 1000
@@ -28,14 +28,14 @@ USE_CPU = False
 CKTP = ''
 
 # Cargar MNIST
-def create_dataloaders(batch_size=BATCH_SIZE, image_size=28,num_workers=4):
+def create_dataloaders(batch_size=BATCH_SIZE, image_size=28,num_workers=4): #esto hay que moverlo a data_loader
     preprocess = transforms.Compose([
         transforms.Resize(image_size),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
     ])
-    train_dataset = MNIST(root="./mnist_data", train=True, download=True, transform=preprocess)
-    test_dataset = MNIST(root="./mnist_data", train=False, download=True, transform=preprocess)
+    train_dataset = MNIST(root="src/data/mnist_data", train=True, download=True, transform=preprocess)
+    test_dataset = MNIST(root="src/data/mnist_data", train=False, download=True, transform=preprocess)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     return train_loader, test_loader
@@ -50,11 +50,11 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
     optimizer = AdamW(model.parameters(), lr=_lr)
     scheduler = OneCycleLR(optimizer, _lr, total_steps=epochs * len(train_loader), pct_start=0.25, anneal_strategy='cos')
     loss_fn = nn.MSELoss(reduction='mean')
-    os.makedirs("data/train_epochs", exist_ok=True)
+    os.makedirs("src/data/train/teacher_epochs", exist_ok=True)
     if CKTP:
         cktp=torch.load(CKTP)
-        model_ema.load_state_dict(cktp["model_ema"])
-        model.load_state_dict(cktp["model"])
+        model_ema.load_state_dict(cktp["model_ema"]) #modelo suavizado
+        model.load_state_dict(cktp["model"])         #modelo normal      #TODO: PREGUNTAR 
         
     global_steps = 0
     for epoch in range(epochs):
@@ -79,12 +79,12 @@ def train_model(train_loader, epochs=EPOCHS, _lr=LEARNING_RATE, device="cuda"):
                 "model_ema":model_ema.state_dict()} 
         model_ema.eval()
         samples = model_ema.module.sampling(N_SAMPLES, clipped_reverse_diffusion=True, device=device)
-        save_image(samples, f"data/train_epochs/epoch_{epoch+1}.png", nrow=int(math.sqrt(N_SAMPLES)), normalize=True)
+        save_image(samples, f"src/data/train/teacher_epochs/epoch_{epoch+1}.png", nrow=int(math.sqrt(N_SAMPLES)), normalize=True)
         
-        torch.save(ckpt, f"data/train_epochs/epoch_{epoch+1}.pt")
+        torch.save(ckpt, f"src/data/train/teacher_epochs/epoch_{epoch+1}.pt")
 
     return model
 
 if __name__ == "__main__":
     train_loader, test_loader = create_dataloaders()
-    train_model(train_loader,device="cpu")
+    train_model(train_loader)

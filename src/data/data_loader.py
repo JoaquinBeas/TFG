@@ -23,3 +23,15 @@ def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=MODEL_IMAGE_SIZE, nu
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     return train_loader, test_loader
+
+def get_mnist_prototypes():
+    transform = transforms.Compose([transforms.ToTensor()])
+    dataset = MNIST(root="./data", train=True, download=True, transform=transform)
+    prototypes = torch.zeros((10, 1, 28, 28))
+    counts = torch.zeros(10)
+    for image, label in dataset:
+        prototypes[label] += image
+        counts[label] += 1
+    counts[counts == 0] = 1
+    prototypes /= counts.view(-1, 1, 1, 1)
+    return prototypes  

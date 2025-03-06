@@ -34,5 +34,6 @@ MNIST_DATA_LOADERS_DIR = "src/data/mnist_data"
 
 # Directorios de modelos y checkpoints
 SAVE_TEACHER_DATA_DIR = "src/data/train/teacher_epochs"
+SAVE_STUDENT_DATA_DIR = "src/data/train/teacher_epochs"
 CKTP = ''
 MODEL_PATH = "src/data/train/teacher_epochs/model.pt"

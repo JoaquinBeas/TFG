@@ -1,4 +1,8 @@
 /gtp_input.txt
 /mnist_data
 __pycache__
-/results
+src/data/labeled_synthetic
+src/data/synthetic
+src/data/mnist_data
+src/data/train
+src/data/MNIST/raw

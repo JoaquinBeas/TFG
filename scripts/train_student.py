@@ -1,9 +1,9 @@
+import sys
 import torch
 import os
 import setup_paths
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, ConcatDataset
 import torch.nn as nn
-from models.mnist_student import MNISTStudent
 from torch.optim import AdamW
 from config import *
 from torchvision.transforms import Compose, Resize, ToTensor
@@ -11,8 +11,14 @@ from PIL import Image
 from torchvision.utils import save_image
 from torch.optim.lr_scheduler import OneCycleLR
 import math
-from torch.utils.data import ConcatDataset
 from utils.exponential_moving_avg import ExponentialMovingAverage
+from enum import Enum
+
+# Definición del Enum
+class StudentModelType(Enum):
+    MNIST_STUDENT_COPY = "mnist_student_copy"
+    MNIST_STUDENT_RESNET = "mnist_student_resnet"
+    MNIST_STUDENT_CNN = "mnist_student_cnn"
 
 class SyntheticNoiseDataset(Dataset):
     def __init__(self, synthetic_dir, labeled_dir):
@@ -45,22 +51,27 @@ class SyntheticNoiseDataset(Dataset):
     def __len__(self):
         return len(self.images)
 
-def train_student(epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE):
+def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE):
     # Dataset y DataLoader
-    dataset = SyntheticNoiseDataset(SYNTHETIC_DIR, OUTPUT_LABELED_DIR)    
-    synthetic_dataset_repeated = ConcatDataset([dataset] * 30) # Esque el dataset era muy pequeño
-    # dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    dataset = SyntheticNoiseDataset(SYNTHETIC_DIR, OUTPUT_LABELED_DIR)
+    synthetic_dataset_repeated = ConcatDataset([dataset] * 30)
     dataloader = DataLoader(synthetic_dataset_repeated, batch_size=BATCH_SIZE, shuffle=True)
 
+    # Seleccionar el modelo según el valor del Enum
+    if model_type == StudentModelType.MNIST_STUDENT_COPY:
+        from models.mnist_student_copy import MNISTStudent as ModelClass
+    elif model_type == StudentModelType.MNIST_STUDENT_RESNET:
+        from models.mnist_student_resnet import MNISTStudentResNet as ModelClass
+    elif model_type == StudentModelType.MNIST_STUDENT_CNN:
+        from models.mnist_student_cnn import MNISTStudentCNN as ModelClass
+    else:
+        raise ValueError(f"Modelo desconocido: {model_type}")
 
-    # Inicialización del modelo student con los mismos parámetros que el teacher
-    model = MNISTStudent(
+    model = ModelClass(
         image_size=MODEL_IMAGE_SIZE,
         in_channels=MODEL_IN_CHANNELS,
-        time_embedding_dim=256,  # mismo valor que en teacher
-        timesteps=TIMESTEPS,
-        base_dim=MODEL_BASE_DIM,         # por ejemplo, 64
-        dim_mults=MODEL_DIM_MULTS        # por ejemplo, [2, 4]
+        time_embedding_dim=256,
+        timesteps=TIMESTEPS
     ).to(device)
 
     # Configuración del EMA, optimizador y scheduler (método similar al teacher)
@@ -105,4 +116,10 @@ def train_student(epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE):
     return model
 
 if __name__ == "__main__":
-    train_student()
+    # Se puede pasar el nombre del modelo a través de un argumento de línea de comandos
+    try:
+        model_arg = sys.argv[1].upper()  # Convertir a mayúsculas para facilitar la comparación
+        model_type = StudentModelType[model_arg]
+    except Exception:
+        model_type = StudentModelType.MNIST_STUDENT_RESNET
+    train_student(model_type=model_type)

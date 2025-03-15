@@ -54,7 +54,7 @@ class SyntheticNoiseDataset(Dataset):
 def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE):
     # Dataset y DataLoader
     dataset = SyntheticNoiseDataset(SYNTHETIC_DIR, OUTPUT_LABELED_DIR)
-    synthetic_dataset_repeated = ConcatDataset([dataset] * 30)
+    synthetic_dataset_repeated = ConcatDataset([dataset] * 70)
     dataloader = DataLoader(synthetic_dataset_repeated, batch_size=BATCH_SIZE, shuffle=True)
 
     # Seleccionar el modelo según el valor del Enum

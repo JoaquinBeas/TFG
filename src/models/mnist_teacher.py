@@ -1,8 +1,11 @@
 import torch.nn as nn
 import torch
 import math
-from utils.unet import Unet
 from tqdm import tqdm
+
+from src.utils.unet_teacher import Unet
+# Descomentar para ejecutar desde aqui
+# from utils.unet_teacher import Unet
 
 
 # La idea principal del modelo es aplicar un proceso de difusión (añadir ruido progresivamente) y, luego aprender a revertirlo usando una arquitectura U-Net

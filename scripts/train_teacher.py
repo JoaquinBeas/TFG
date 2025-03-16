@@ -1,4 +1,3 @@
-import setup_paths
 import sys
 import torch
 import os
@@ -10,10 +9,19 @@ from torch.optim import AdamW
 from torchvision.utils import save_image
 from torch.optim.lr_scheduler import OneCycleLR
 import torch.nn as nn
-from models.mnist_teacher import MNISTDiffusion
-from utils.exponential_moving_avg import ExponentialMovingAverage
-from config import *
-from data.data_loader import get_mnist_dataloaders
+
+from src.models.mnist_teacher import MNISTDiffusion
+from src.utils.exponential_moving_avg import ExponentialMovingAverage
+from src.config import *
+from src.utils.data_loader import get_mnist_dataloaders
+
+# Descomentar para ejecutar desde aqui
+
+# from models.mnist_teacher import MNISTDiffusion
+# from utils.exponential_moving_avg import ExponentialMovingAverage
+# from config import *
+# from utils.data_loader import get_mnist_dataloaders
+
 
 # Entrenamiento del modelo
 def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="cuda"):
@@ -25,7 +33,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
     optimizer = AdamW(model.parameters(), lr=_lr)
     scheduler = OneCycleLR(optimizer, _lr, total_steps=epochs * len(train_loader), pct_start=0.25, anneal_strategy='cos')
     loss_fn = nn.MSELoss(reduction='mean')
-    os.makedirs(SAVE_TEACHER_DATA_DIR, exist_ok=True)
+    os.makedirs(SAVE_TEACHER_IMAGES_DIR, exist_ok=True)
     if CKTP:
         cktp=torch.load(CKTP)
         model_ema.load_state_dict(cktp["model_ema"]) #modelo suavizado
@@ -51,9 +59,10 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
                 "model_ema":model_ema.state_dict()} 
         model_ema.eval()
         samples = model_ema.module.sampling(N_SAMPLES_TRAIN, clipped_reverse_diffusion=True, device=device)
-        save_image(samples, SAVE_TEACHER_DATA_DIR+f"/epoch_{epoch+1}.png", nrow=int(math.sqrt(N_SAMPLES_TRAIN)), normalize=True)
-        # torch.save(ckpt, f"src/data/train/teacher_epochs/epoch_{epoch+1}.pt") Guardar cada modelo
-    torch.save(ckpt, MODEL_PATH) # Guardar solo el último modelo 
+        save_image(samples, os.path.join(SAVE_TEACHER_IMAGES_DIR, f"epoch_{epoch+1}.png"),
+           nrow=int(math.sqrt(N_SAMPLES_TRAIN)), normalize=True)        # torch.save(ckpt, f"src/data/train/teacher_epochs/epoch_{epoch+1}.pt") Guardar cada modelo
+    os.makedirs(SAVE_MODELS_DIR, exist_ok=True)
+    torch.save(ckpt, MODEL_PATH)
     return model
 
 if __name__ == "__main__":

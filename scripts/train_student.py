@@ -19,6 +19,7 @@ class StudentModelType(Enum):
     MNIST_STUDENT_COPY = "mnist_student_copy"
     MNIST_STUDENT_RESNET = "mnist_student_resnet"
     MNIST_STUDENT_CNN = "mnist_student_cnn"
+    MNIST_STUDENT_GUIDED = "mnist_student_guided"
 
 class SyntheticNoiseDataset(Dataset):
     def __init__(self, synthetic_dir, labeled_dir):
@@ -64,6 +65,8 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
         from models.mnist_student_resnet import MNISTStudentResNet as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_CNN:
         from models.mnist_student_cnn import MNISTStudentCNN as ModelClass
+    elif model_type == StudentModelType.MNIST_STUDENT_GUIDED:
+        from models.mnist_student_guided import MNISTStudentGuided as ModelClass
     else:
         raise ValueError(f"Modelo desconocido: {model_type}")
 
@@ -121,5 +124,5 @@ if __name__ == "__main__":
         model_arg = sys.argv[1].upper()  # Convertir a mayúsculas para facilitar la comparación
         model_type = StudentModelType[model_arg]
     except Exception:
-        model_type = StudentModelType.MNIST_STUDENT_RESNET
+        model_type = StudentModelType.MNIST_STUDENT_GUIDED
     train_student(model_type=model_type)

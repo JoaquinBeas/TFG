@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import math
-from utils.unet import Unet
+from utils.unet_teacher import Unet
 from tqdm import tqdm
 
 

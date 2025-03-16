@@ -64,7 +64,7 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
     elif model_type == StudentModelType.MNIST_STUDENT_RESNET:
         from models.mnist_student_resnet import MNISTStudentResNet as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_CNN:
-        from models.mnist_student_cnn import MNISTStudentCNN as ModelClass
+        from models.mnist_student_score import MNISTStudentCNN as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_GUIDED:
         from models.mnist_student_guided import MNISTStudentGuided as ModelClass
     else:

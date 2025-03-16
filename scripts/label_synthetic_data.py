@@ -5,7 +5,7 @@ from torchvision.transforms import ToTensor, Resize, Compose
 from PIL import Image
 from models.mnist_teacher import MNISTDiffusion
 from config import *
-from data.data_loader import get_mnist_prototypes
+from utils.data_loader import get_mnist_prototypes
 from torch.utils.data import Dataset, DataLoader
 
 class SyntheticImageDataset(Dataset):

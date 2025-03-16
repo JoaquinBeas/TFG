@@ -170,10 +170,3 @@ class MNISTStudentResNet(nn.Module):
         # Normaliza la salida al rango [0, 1]
         x_t = (x_t + 1.0) / 2.0
         return x_t
-
-# Ejemplo de uso (para pruebas)
-if __name__ == "__main__":
-    model = MNISTStudentResNet().to("cuda")
-    # Generar una imagen de sampling
-    samples = model.sampling(4, device="cuda")
-    print(samples.shape)

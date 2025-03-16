@@ -4,7 +4,7 @@ from torchvision.datasets import MNIST
 from torchvision import transforms
 import os
 
-from config import *
+from src.config import *
 
 # Definir la ruta base de los datos
 
@@ -25,7 +25,7 @@ def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=MODEL_IMAGE_SIZE, nu
 
 def get_mnist_prototypes():
     transform = transforms.Compose([transforms.ToTensor()])
-    dataset = MNIST(root="./data", train=True, download=True, transform=transform)
+    dataset = MNIST(root=MNIST_DATA_LOADERS_DIR, train=True, download=True, transform=transform)
     prototypes = torch.zeros((10, 1, 28, 28))
     counts = torch.zeros(10)
     for image, label in dataset:

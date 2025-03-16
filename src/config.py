@@ -11,8 +11,8 @@ USE_CPU = False
 # Configuración del entrenamiento
 BATCH_SIZE = 128
 LEARNING_RATE = 0.002
-EPOCHS_TEACHER = 2  # Modelo final debería ser 100
-EPOCHS_STUDENT = 2
+EPOCHS_TEACHER = 70
+EPOCHS_STUDENT = 70
 LOG_FREQ = 10
 N_SAMPLES_TRAIN = 36
 N_SAMPLES_GENERATE = 1000
@@ -37,9 +37,8 @@ MNIST_DATA_LOADERS_DIR = os.path.join("src", "data", "mnist_data")
 # Carpeta para guardar los modelos (checkpoints .pt)
 SAVE_MODELS_DIR = os.path.join("src", "data", "models_pt")
 CKTP = ''
-# Por ejemplo, para teacher y para student guided
+
 MODEL_PATH = os.path.join(SAVE_MODELS_DIR, "model_teacher.pt")
-MODEL_PATH_STUDENT = os.path.join(SAVE_MODELS_DIR, "model_student_guided.pt")
 
 # Carpeta para guardar imágenes de cada época.
 # Dentro de "src/data/train" se crearán subcarpetas para cada modelo.

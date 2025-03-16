@@ -1,18 +1,23 @@
 import sys
 import torch
 import os
-import setup_paths
 from torch.utils.data import DataLoader, Dataset, ConcatDataset
 import torch.nn as nn
 from torch.optim import AdamW
-from config import *
 from torchvision.transforms import Compose, Resize, ToTensor
 from PIL import Image
 from torchvision.utils import save_image
 from torch.optim.lr_scheduler import OneCycleLR
-import math
-from utils.exponential_moving_avg import ExponentialMovingAverage
 from enum import Enum
+import math
+
+from src.utils.exponential_moving_avg import ExponentialMovingAverage
+from src.config import *
+
+# Descomentar para ejecutar desde aqui
+
+# from utils.exponential_moving_avg import ExponentialMovingAverage
+# from config import *
 
 # Definición del Enum
 class StudentModelType(Enum):
@@ -59,11 +64,11 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
 
     # Seleccionar el modelo según el valor del Enum
     if model_type == StudentModelType.MNIST_STUDENT_COPY:
-        from models.mnist_student_copy import MNISTStudent as ModelClass
+        from src.models.mnist_student_copy import MNISTStudent as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_RESNET:
-        from models.mnist_student_resnet import MNISTStudentResNet as ModelClass
+        from src.models.mnist_student_resnet import MNISTStudentResNet as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_GUIDED:
-        from models.mnist_student_guided import MNISTStudentGuided as ModelClass
+        from src.models.mnist_student_guided import MNISTStudentGuided as ModelClass
     else:
         raise ValueError(f"Modelo desconocido: {model_type}")
 

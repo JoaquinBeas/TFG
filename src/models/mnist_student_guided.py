@@ -1,14 +1,21 @@
 import torch as th
 import torch.nn as nn
-from config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS, MODEL_BASE_DIM, MODEL_DIM_MULTS
-from utils.unet_guided import UNetModel
-from utils.gaussian_diffusion import (
+from src.config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS, MODEL_BASE_DIM, MODEL_DIM_MULTS
+from src.utils.unet_guided import UNetModel
+from src.utils.gaussian_diffusion import (
     GaussianDiffusion,
     get_named_beta_schedule,
     ModelMeanType,
     ModelVarType,
     LossType,
 )
+
+# Descomentar para ejecutar desde aqui
+
+# from config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS, MODEL_BASE_DIM, MODEL_DIM_MULTS
+# from utils.unet_guided import UNetModel
+# from utils.gaussian_diffusion import (GaussianDiffusion,get_named_beta_schedule,ModelMeanType,ModelVarType, LossType)
+
 class MNISTStudentGuided(nn.Module):
     def __init__(
         self,

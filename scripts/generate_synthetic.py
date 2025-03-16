@@ -1,10 +1,14 @@
 import sys
 import torch
 import os
-import setup_paths
-from models.mnist_teacher import MNISTDiffusion
 from torchvision.utils import save_image
-from config import *
+
+from src.models.mnist_teacher import MNISTDiffusion
+from src.config import *
+
+# Descomentar para ejecutar desde aqui
+# from models.mnist_teacher import MNISTDiffusion  
+# from config import *
 
 # Generar imágenes sintéticas
 def generate_synthetic_data():

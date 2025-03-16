@@ -3,7 +3,10 @@ import torch
 import torch.nn as nn
 import math
 from tqdm import tqdm
-from config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS
+
+from src.config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS
+# Descomentar para ejecutar desde aqui
+# from config import MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):

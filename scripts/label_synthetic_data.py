@@ -1,12 +1,17 @@
 import os
 import torch
-import setup_paths
 from torchvision.transforms import ToTensor, Resize, Compose
 from PIL import Image
-from models.mnist_teacher import MNISTDiffusion
-from config import *
-from utils.data_loader import get_mnist_prototypes
 from torch.utils.data import Dataset, DataLoader
+from src.models.mnist_teacher import MNISTDiffusion
+from src.config import *
+from src.utils.data_loader import get_mnist_prototypes
+
+# Descomentar para ejecutar desde aqui
+
+# from models.mnist_teacher import MNISTDiffusion
+# from config import *
+# from utils.data_loader import get_mnist_prototypes
 
 class SyntheticImageDataset(Dataset):
     def __init__(self, synthetic_dir, transform=None):
@@ -73,8 +78,8 @@ def label_synthetic_data():
     # Crear dataset y dataloader (ajusta num_workers según tu sistema)
     dataset = SyntheticImageDataset(SYNTHETIC_DIR, transform=transform)
     dataloader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)
-
     model = load_teacher_model()
+
     prototypes = get_mnist_prototypes().to(DEVICE)  # [10, 1, 28, 28]
 
     os.makedirs(OUTPUT_LABELED_DIR, exist_ok=True)

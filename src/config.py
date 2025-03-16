@@ -11,7 +11,7 @@ USE_CPU = False
 # Configuración del entrenamiento
 BATCH_SIZE = 128
 LEARNING_RATE = 0.002
-EPOCHS_TEACHER = 40  # Modelo final debería ser 100
+EPOCHS_TEACHER = 70  # Modelo final debería ser 100
 EPOCHS_STUDENT = 70
 LOG_FREQ = 10
 N_SAMPLES_TRAIN = 36

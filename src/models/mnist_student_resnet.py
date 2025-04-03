@@ -150,10 +150,10 @@ class MNISTStudentResNet(nn.Module):
         x_0_pred = (torch.sqrt(1.0 / alpha_t_cumprod) * x_t - torch.sqrt(1.0 / alpha_t_cumprod - 1.0) * pred)
         x_0_pred.clamp_(-1.0, 1.0)
         if t.min() > 0:
-            alpha_t_cumprod_prev = self.alphas_cumprod.gather(0, (t - 1)).reshape(x_t.shape[0], 1, 1, 1)
+            alpha_t_cumprod_prev = self.alphas_cumprod.gather(0, (t - 1)).reshape(x_t.shape[0], 1, 1, 1)//TODO:
             mean = (beta_t * torch.sqrt(alpha_t_cumprod_prev) / (1.0 - alpha_t_cumprod)) * x_0_pred + \
                    ((1.0 - alpha_t_cumprod_prev) * torch.sqrt(alpha_t) / (1.0 - alpha_t_cumprod)) * x_t
-            std = torch.sqrt(beta_t * (1.0 - alpha_t_cumprod_prev) / (1.0 - alpha_t_cumprod))
+            std = torch.sqrt(beta_t * (1.0 - alpha_t_cumprod_prev) / (1.0 - alpha_t_cumprod))//TODO:
         else:
             mean = (beta_t / (1.0 - alpha_t_cumprod)) * x_0_pred
             std = 0.0
@@ -164,7 +164,7 @@ class MNISTStudentResNet(nn.Module):
         # Comienza con un tensor de ruido y aplica el proceso de reverse diffusion.
         x_t = torch.randn((n_samples, self.in_channels, self.image_size, self.image_size)).to(device)
         for i in tqdm(range(self.timesteps - 1, -1, -1), desc="Sampling"):
-            noise = torch.randn_like(x_t).to(device)
+            noise = torch.randn_like(x_t).to(device) //TODO:
             t = torch.full((n_samples,), i, device=device, dtype=torch.long)
             if clipped_reverse_diffusion:
                 x_t = self._reverse_diffusion_with_clip(x_t, t, noise)

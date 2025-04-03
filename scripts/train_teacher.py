@@ -34,6 +34,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
     scheduler = OneCycleLR(optimizer, _lr, total_steps=epochs * len(train_loader), pct_start=0.25, anneal_strategy='cos')
     loss_fn = nn.MSELoss(reduction='mean')
     os.makedirs(SAVE_TEACHER_IMAGES_DIR, exist_ok=True)
+    os.makedirs(SAVE_MODELS_TEACHER_DIR, exist_ok=True)
     if CKTP:
         cktp=torch.load(CKTP)
         model_ema.load_state_dict(cktp["model_ema"]) #modelo suavizado
@@ -61,8 +62,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
         samples = model_ema.module.sampling(N_SAMPLES_TRAIN, clipped_reverse_diffusion=True, device=device)
         save_image(samples, os.path.join(SAVE_TEACHER_IMAGES_DIR, f"epoch_{epoch+1}.png"),
            nrow=int(math.sqrt(N_SAMPLES_TRAIN)), normalize=True)        # torch.save(ckpt, f"src/data/train/teacher_epochs/epoch_{epoch+1}.pt") Guardar cada modelo
-    os.makedirs(SAVE_MODELS_DIR, exist_ok=True)
-    torch.save(ckpt, MODEL_PATH)
+        torch.save(ckpt, os.path.join(SAVE_MODELS_TEACHER_DIR, f"model_teacher_{epoch+1}.pt"))
     return model
 
 if __name__ == "__main__":

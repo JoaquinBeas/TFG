@@ -96,13 +96,13 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
 
     # Crear el directorio para guardar imágenes, usando el nombre del modelo
     # Por ejemplo: "mnist_student_copy_epochs", "mnist_student_resnet_epochs", "mnist_student_guided_epochs"
-    train_dir = os.path.join("src", "data", "train")
-    student_images_dir = os.path.join(train_dir, f"{model_type.value}_epochs")
-    os.makedirs(student_images_dir, exist_ok=True)
     # Asegurar que exista la carpeta de modelos
-    models_dir = os.path.join("src", "data", "models_pt")
-    os.makedirs(models_dir, exist_ok=True)
-
+    os.makedirs(SAVE_STUDENT_IMAGES_DIR, exist_ok=True)
+    os.makedirs(SAVE_MODELS_STUDENT_DIR, exist_ok=True)
+    if CKTP:
+        cktp=torch.load(CKTP)
+        model_ema.load_state_dict(cktp["model_ema"]) #modelo suavizado
+        model.load_state_dict(cktp["model"])         #modelo normal 
     global_steps = 0
     for epoch in range(epochs):
         model.train()
@@ -127,11 +127,9 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
         model_ema.eval()
         samples = model_ema.module.sampling(N_SAMPLES_TRAIN, clipped_reverse_diffusion=True, device=device)
         # Guardar la imagen en la carpeta específica del modelo (sobrescribiendo si ya existe)
-        save_image(samples, os.path.join(student_images_dir, f"epoch_{epoch+1}.png"),
+        save_image(samples, os.path.join(SAVE_STUDENT_IMAGES_DIR, f"epoch_{epoch+1}.png"),
                    nrow=int(math.sqrt(N_SAMPLES_TRAIN)), normalize=True)
-    # Guardar el checkpoint final del modelo student
-    student_checkpoint_path = os.path.join(models_dir, student_checkpoint_name)
-    torch.save(ckpt, student_checkpoint_path)
+        torch.save(ckpt, os.path.join(SAVE_MODELS_STUDENT_DIR, f"model_student_{epoch+1}.pt"))
     return model
 
 if __name__ == "__main__":

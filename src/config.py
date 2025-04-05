@@ -46,3 +46,6 @@ SAVE_STUDENT_IMAGES_DIR = os.path.join(TRAIN_DIR, "model_student_epochs")
 
 LAST_TEACHER_CKPT = os.path.join(SAVE_MODELS_TEACHER_DIR, f"model_teacher_{EPOCHS_TEACHER}.pt")
 LAST_STUDENT_CKPT = os.path.join(SAVE_MODELS_STUDENT_DIR, f"model_student_{EPOCHS_STUDENT}.pt")
+
+SAVE_TEACHER_IMAGES_CURVE_DIR = os.path.join(TRAIN_DIR, "model_teacher_train_curve")
+SAVE_STUDENT_IMAGES_CURVE_DIR = os.path.join(TRAIN_DIR, "model_student_train_curve")

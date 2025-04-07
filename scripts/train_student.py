@@ -57,10 +57,10 @@ class SyntheticNoiseDataset(Dataset):
     def __len__(self):
         return len(self.images)
 
-def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE, patience=5, min_delta=1e-4):
+def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_STUDENT, lr=LEARNING_RATE, device=DEVICE, patience=8, min_delta=1e-6):
     # Dataset y DataLoader
     dataset = SyntheticNoiseDataset(SYNTHETIC_DIR, OUTPUT_LABELED_DIR)
-    synthetic_dataset_repeated = ConcatDataset([dataset] * 70)
+    synthetic_dataset_repeated = ConcatDataset([dataset] *10)
 
     # Calcular los tamaños para la división 85% / 15%
     total_len = len(synthetic_dataset_repeated)
@@ -80,7 +80,7 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
     
     # Seleccionar el modelo según el valor del Enum
     if model_type == StudentModelType.MNIST_STUDENT_COPY:
-        from src.models.mnist_student_copy import MNISTStudent as ModelClass
+        from src.models.mnist_teacher import MNISTDiffusion as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_RESNET:
         from src.models.mnist_student_resnet import MNISTStudentResNet as ModelClass
     elif model_type == StudentModelType.MNIST_STUDENT_GUIDED:
@@ -147,7 +147,7 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
             global_steps += 1
 
             if step % LOG_FREQ == 0:
-                print(f"Epoch[{epoch+1}/{epochs}], Step[{step}/{len(train_loader)}], Loss: {loss.item():.5f}, LR: {scheduler.get_last_lr()[0]:.5f}")
+                print(f"Epoch[{epoch+1}/{epochs}], Step[{step}/{len(train_loader)}], Loss: {loss.item():.8f}, LR: {scheduler.get_last_lr()[0]:.8f}")
         # Al finalizar cada época, se generan imágenes sintéticas con el modelo suavizado
         ckpt = {"model": model.state_dict(), "model_ema": model_ema.state_dict()}
         model_ema.eval()
@@ -172,7 +172,7 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
         save_image(samples, os.path.join(SAVE_STUDENT_IMAGES_DIR, f"epoch_{epoch+1}.png"),
                    nrow=int(math.sqrt(N_SAMPLES_TRAIN)), normalize=True)
         torch.save(ckpt, os.path.join(SAVE_MODELS_STUDENT_DIR, f"model_student_{epoch+1}.pt"))
-        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.5f}, Val Loss: {avg_val_loss:.5f}")
+        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.8f}, Val Loss: {avg_val_loss:.8f}")
         if best_val_loss - avg_val_loss > min_delta:
             best_val_loss = avg_val_loss
             counter = 0
@@ -182,7 +182,7 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
             # Guardar el mejor modelo en un archivo separado
             best_ckpt = {"model": model.state_dict(), "model_ema": model_ema.state_dict(), "epoch": epoch+1}
             torch.save(best_ckpt, os.path.join(SAVE_MODELS_STUDENT_DIR, "best_model_student.pt"))
-            print(f"Nuevo mejor modelo guardado (Val Loss: {best_val_loss:.5f})")
+            print(f"Nuevo mejor modelo guardado (Val Loss: {best_val_loss:.8f})")
         else:
             counter += 1
             print(f"EarlyStopping counter: {counter}/{patience}")
@@ -194,8 +194,8 @@ def train_student(model_type=StudentModelType.MNIST_STUDENT_COPY, epochs=EPOCHS_
     if counter >= patience and best_model is not None and best_model_ema is not None:
         model.load_state_dict(best_model)
         model_ema.load_state_dict(best_model_ema)
-        print(f"Modelo restaurado a la mejor época con pérdida de validación: {best_val_loss:.5f}")
-    
+        print(f"Modelo restaurado a la mejor época con pérdida de validación: {best_val_loss:.8f}")
+    torch.save(best_ckpt, os.path.join(LAST_STUDENT_CKPT))
     # Generar imágenes con el mejor modelo
     model_ema.eval()
     final_samples = model_ema.module.sampling(N_SAMPLES_TRAIN, clipped_reverse_diffusion=True, device=device)

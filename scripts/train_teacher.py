@@ -17,7 +17,7 @@ from src.utils.data_loader import get_mnist_dataloaders
 from src.utils.training_plot import plot_training_curves
 
 # Entrenamiento del modelo
-def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="cuda", patience=5, min_delta=1e-4):
+def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="cuda", patience=8, min_delta=1e-6):
     full_dataset = train_loader.dataset
     total_len = len(full_dataset)
     val_len = int(0.15 * total_len)
@@ -68,7 +68,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
                 model_ema.update_parameters(model)
             global_steps += 1   
             if step % LOG_FREQ == 0:
-                print(f"Epoch[{epoch+1}/{epochs}], Step[{step}/{len(train_loader)}], Loss: {loss.item():.5f}, LR: {scheduler.get_last_lr()[0]:.5f}")
+                print(f"Epoch[{epoch+1}/{epochs}], Step[{step}/{len(train_loader)}], Loss: {loss.item():.8f}, LR: {scheduler.get_last_lr()[0]:.8f}")
         ckpt={"model":model.state_dict(),
                 "model_ema":model_ema.state_dict()} 
         model_ema.eval()
@@ -97,7 +97,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
         torch.save(ckpt, os.path.join(SAVE_MODELS_TEACHER_DIR, f"model_teacher_{epoch+1}.pt"))
         
         # Comprobar early stopping
-        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.5f}, Val Loss: {avg_val_loss:.5f}")
+        print(f"Epoch {epoch+1}/{epochs} - Train Loss: {avg_train_loss:.8f}, Val Loss: {avg_val_loss:.8f}")
         
         # Si la pérdida de validación ha mejorado más que min_delta
         if best_val_loss - avg_val_loss > min_delta:
@@ -109,7 +109,7 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
             # Guardar el mejor modelo en un archivo separado
             best_ckpt = {"model": model.state_dict(), "model_ema": model_ema.state_dict(), "epoch": epoch+1}
             torch.save(best_ckpt, os.path.join(SAVE_MODELS_TEACHER_DIR, "best_model_teacher.pt"))
-            print(f"Nuevo mejor modelo guardado (Val Loss: {best_val_loss:.5f})")
+            print(f"Nuevo mejor modelo guardado (Val Loss: {best_val_loss:.8f})")
         else:
             counter += 1
             print(f"EarlyStopping counter: {counter}/{patience}")
@@ -122,8 +122,8 @@ def train_model(train_loader, epochs=EPOCHS_TEACHER, _lr=LEARNING_RATE, device="
     if counter >= patience and best_model is not None and best_model_ema is not None:
         model.load_state_dict(best_model)
         model_ema.load_state_dict(best_model_ema)
-        print(f"Modelo restaurado a la mejor época con pérdida de validación: {best_val_loss:.5f}")
-    
+        print(f"Modelo restaurado a la mejor época con pérdida de validación: {best_val_loss:.8f}")
+    torch.save(best_ckpt, os.path.join(LAST_TEACHER_CKPT))
     # Generar imágenes con el mejor modelo
     model_ema.eval()
     final_samples = model_ema.module.sampling(N_SAMPLES_TRAIN, clipped_reverse_diffusion=True, device=device)

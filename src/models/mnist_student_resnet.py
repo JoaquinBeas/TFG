@@ -1,5 +1,3 @@
-# src/models/mnist_teacher_resnet.py
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -101,7 +99,7 @@ class MNISTStudentResNet(nn.Module):
         return pred_noise
 
     @torch.no_grad()
-    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda"):
+    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda", x_t_scale=1.0, noise_scale=1.0):
         """
         Genera imágenes a partir de ruido puro en el espacio latente mediante reverse diffusion.
         La rutina es similar a la del modelo teacher original:
@@ -110,10 +108,10 @@ class MNISTStudentResNet(nn.Module):
          - Finalmente, se decodifica el vector latente a una imagen (usando self.decoder).
         """
         B = n_samples
-        latent = torch.randn(B, self.backbone.fc.in_features, device=device)
+        latent = torch.randn(B, self.backbone.fc.in_features, device=device) * x_t_scale
         for i in range(self.timesteps - 1, -1, -1):
             t = torch.full((B,), i, device=device, dtype=torch.long)
-            noise = torch.randn_like(latent)
+            noise = torch.randn_like(latent) * noise_scale
             # Obtener predicción de ruido en el estado actual.
             pred_noise = self.noise_predictor(latent)
             # Extraer valores necesarios del schedule.

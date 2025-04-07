@@ -95,7 +95,7 @@ class MNISTStudentGuided(nn.Module):
         # The guided UNet expects x_t and a 1D tensor t.
         return self.unet(x_t, t)
 
-    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda"):
+    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda", x_t_scale=1.0, noise_scale=1.0):
         """
         Use the diffusion sampling routine to generate images.
         """

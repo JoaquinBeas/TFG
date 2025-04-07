@@ -1,11 +1,10 @@
 import os
-import setup_paths
 from collections import Counter
 import matplotlib.pyplot as plt
 import os
 from collections import Counter
 import matplotlib.pyplot as plt
-from config import OUTPUT_LABELED_DIR
+from src.config import OUTPUT_LABELED_DIR
 from scripts.generate_synthetic import generate_synthetic_data
 from scripts.label_synthetic_data import label_synthetic_data
 

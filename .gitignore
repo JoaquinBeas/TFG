@@ -1,11 +1,1 @@
-/gtp_input.txt
-/mnist_data
 __pycache__
-src/data/labeled_synthetic
-src/data/synthetic
-src/data/mnist_data
-src/data/train
-src/data/MNIST/raw
-src/data/models_student
-src/data/models_teacher
-experiments/temp_sampling

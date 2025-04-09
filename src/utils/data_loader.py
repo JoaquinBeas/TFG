@@ -2,13 +2,12 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision import transforms
-import os
 
-from src.config import *
+from src.utils.config import BATCH_SIZE, IMAGE_SIZE, MNIST_DATA_LOADERS_DIR, NUM_WORKERS
 
 # Definir la ruta base de los datos
 
-def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=MODEL_IMAGE_SIZE, num_workers=4):
+def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=IMAGE_SIZE, num_workers=NUM_WORKERS):
     preprocess = transforms.Compose([
         transforms.Resize(image_size),
         transforms.ToTensor(),

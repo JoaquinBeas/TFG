@@ -14,7 +14,7 @@ from src.config import *
 def generate_synthetic_data():
     os.makedirs(SYNTHETIC_DIR, exist_ok=True)
     model = MNISTDiffusion(image_size=MODEL_IMAGE_SIZE, in_channels=MODEL_IN_CHANNELS, base_dim=MODEL_BASE_DIM, dim_mults=MODEL_DIM_MULTS).to(DEVICE)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE)["model"])
+    model.load_state_dict(torch.load(LAST_TEACHER_CKPT, map_location=DEVICE)["model"])
     model.eval()
     with torch.no_grad():
         samples = model.sampling(N_SAMPLES_GENERATE, device=DEVICE)

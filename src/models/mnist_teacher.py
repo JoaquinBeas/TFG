@@ -72,14 +72,11 @@ class MNISTDiffusion(nn.Module):
     # Salidas:
     #   x_t: tensor final que representa la imagen generada
     @torch.no_grad()
-    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda"):
+    def sampling(self, n_samples, clipped_reverse_diffusion=True, device="cuda", x_t_scale=1.0, noise_scale=1.0):
         # Se crea un tensor x_t inicial lleno de ruido (normal)
-        x_t = torch.randn(
-            (n_samples, self.in_channels, self.image_size, self.image_size)
-        ).to(device)
-        for i in tqdm(range(self.timesteps - 1, -1, -1), desc="Sampling"):
-            # Se crea un tensor noise con la misma forma que x_t
-            noise = torch.randn_like(x_t).to(device)
+        x_t = torch.randn((n_samples, self.in_channels, self.image_size, self.image_size)).to(device) * x_t_scale
+        for i in tqdm(range(self.timesteps - 1, -1, -1), desc=f"x_t={x_t_scale}, noise={noise_scale}"):
+            noise = torch.randn_like(x_t).to(device) * noise_scale
             t = torch.tensor([i for _ in range(n_samples)]).to(device)
             # Segun si se usa clipaje se usa una difusion o otra
             if clipped_reverse_diffusion:

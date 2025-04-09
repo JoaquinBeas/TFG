@@ -34,7 +34,7 @@ class SyntheticImageDataset(Dataset):
         return image, filename
 
 def load_teacher_model():
-    checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+    checkpoint = torch.load(LAST_TEACHER_CKPT, map_location=DEVICE)
     model = MNISTDiffusion(
         image_size=MODEL_IMAGE_SIZE, 
         in_channels=MODEL_IN_CHANNELS, 

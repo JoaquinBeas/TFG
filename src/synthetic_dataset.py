@@ -1,7 +1,8 @@
+import os
 import torch
-from src.utils.config import DEVICE
+from src.utils.config import DEVICE, SAVE_SYNTHETIC_DATASET_DIR
 
-class DataSetGenerator:
+class SyntheticDataset:
     def __init__(self, diffusion_model, mnist_model):
         """
         Initialize the dataset generator with already loaded models.
@@ -15,7 +16,7 @@ class DataSetGenerator:
         self.mnist_model = mnist_model.to(DEVICE)
         self.mnist_model.eval()
 
-    def generate_dataset(self, n_samples, output_path="generated_dataset.pt"):
+    def generate_dataset(self, n_samples, output_path=SAVE_SYNTHETIC_DATASET_DIR):
         """
         Generates a dataset using the diffusion model's sampling and MNIST model's predictions.
         
@@ -34,6 +35,7 @@ class DataSetGenerator:
             predicted_labels = outputs.argmax(dim=1)
         
         dataset = {"samples": samples.cpu(), "labels": predicted_labels.cpu()}
-        torch.save(dataset, output_path)
+        os.makedirs(output_path, exist_ok=True)
+        torch.save(dataset, os.path.join(output_path, f"generated_dataset.pt"))
         print(f"Dataset generated and saved to: {output_path}")
         return dataset

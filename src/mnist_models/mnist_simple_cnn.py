@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.nn.functional as F
-
 from src.utils.config import MNIST_N_CLASSES
 
 class MNISTCNN(nn.Module):

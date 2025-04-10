@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from src.utils.config import MODEL_IMAGE_SIZE, TIMESTEPS
 from src.utils.resnet import resnet18
 
-class DifussionResnet(nn.Module):
+class DiffusionResnet(nn.Module):
     def __init__(self, feature_dim=512, step_size=0.1, diffusion_steps=5):
         """
         feature_dim: dimensión de la representación extraída por la ResNet (por ejemplo, 512).

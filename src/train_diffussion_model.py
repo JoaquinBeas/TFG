@@ -4,28 +4,40 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision.utils import save_image
 from torch.utils.data import DataLoader, random_split
-from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, TRAIN_DIFUSSION_MODEL_DIR, TRAIN_DIFUSSION_SAMPLES_DIR
+from enum import Enum
+from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet
+from src.diffusion_models.diffusion_resnet import DiffusionResnet
+from src.diffusion_models.diffusion_unet import DiffusionUnet
+from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, TRAIN_DIFFUSION_MODEL_DIR, TRAIN_DIFFUSION_SAMPLES_DIR, MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS
 from src.utils.data_loader import get_mnist_dataloaders
-from src.difussion_models.difussion_guided_unet import DifussionGuidedUnet
-
+from src.utils.mnist_models_enum import DiffusionModelType
 
 class DiffussionTrainer:
-    def __init__(self, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE, 
-                 model_name="difussion_guided_unet", early_stopping_patience=3):
+    def __init__(
+        self,
+        model_type: DiffusionModelType = DiffusionModelType.GUIDED_UNET,
+        num_epochs=MNIST_EPOCHS,
+        learning_rate=MNIST_LEARNING_RATE,
+        batch_size=MNIST_BATCH_SIZE,
+        early_stopping_patience=3,
+        model_path=TRAIN_DIFFUSION_MODEL_DIR,
+        image_path=TRAIN_DIFFUSION_SAMPLES_DIR
+    ):
         """
         Inicializa el entrenador para el modelo de difusión.
-        
-        Configura el dispositivo, carga los dataloaders (se utiliza MNIST como ejemplo),
-        instancia el modelo DifussionGuidedUnet, el optimizador y la función de pérdida (MSE).
-        Además, realiza la división del dataset de entrenamiento en 85%/15% para entrenamiento y validación
-        y crea el directorio para guardar los checkpoints.
-        
+        Se configura el dispositivo, se cargan los dataloaders (se utiliza MNIST como ejemplo),
+        se instancia el modelo correspondiente al valor del enum, el optimizador y la función de pérdida (MSE).
+        Además, se realiza la división del dataset de entrenamiento en 85%/15% para entrenamiento y validación
+        y se crea el directorio para guardar los checkpoints.
+
         Args:
+            model_type (DiffusionModelType): Enum que indica qué modelo de difusión entrenar.
             num_epochs (int): Número de épocas de entrenamiento.
             learning_rate (float): Tasa de aprendizaje para el optimizador.
             batch_size (int): Tamaño de lote para el entrenamiento.
-            model_name (str): Nombre del modelo, usado para crear la carpeta de checkpoints.
-            early_stopping_patience (int): Épocas sin mejora en validación antes de detener el entrenamiento.
+            early_stopping_patience (int): Número de épocas sin mejora en validación antes de detener el entrenamiento.
+            model_path (str): Ruta base donde se guardarán los checkpoints.
+            image_path (str): Ruta base donde se guardarán las imágenes de muestra.
         """
         self.device = torch.device(DEVICE)
         full_train_loader, self.test_loader = get_mnist_dataloaders(batch_size=batch_size)
@@ -38,20 +50,33 @@ class DiffussionTrainer:
         self.train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
         self.val_loader   = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
         
-        self.model = DifussionGuidedUnet().to(self.device)
+        # Seleccionar e instanciar el modelo según el tipo del enum.
+        if model_type == DiffusionModelType.GUIDED_UNET:
+            self.model = DiffusionGuidedUnet().to(self.device)
+        elif model_type == DiffusionModelType.RESNET:
+            self.model = DiffusionResnet().to(self.device)
+        elif model_type == DiffusionModelType.UNET:
+            self.model = DiffusionUnet(image_size=MODEL_IMAGE_SIZE, in_channels=MODEL_IN_CHANNELS, timesteps=TIMESTEPS).to(self.device)
+        else:
+            raise ValueError("Modelo de difusión desconocido.")
+        
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.MSELoss()  # Se minimiza el error cuadrático entre el ruido predicho y el real.
-        self.model_name = model_name
-        self.early_stopping_patience = early_stopping_patience
         
-        # Crear el directorio para almacenar los checkpoints del modelo.
-        self.checkpoint_dir = os.path.join(TRAIN_DIFUSSION_MODEL_DIR, self.model_name)
+        # Usar el valor del enum para crear la carpeta de checkpoints.
+        self.checkpoint_dir = os.path.join(model_path, model_type.value)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         print(f"Directorio de checkpoints: {self.checkpoint_dir}")
-        os.makedirs(TRAIN_DIFUSSION_SAMPLES_DIR, exist_ok=True)
+        
+        # Crear una carpeta de imágenes dentro del directorio base, usando el nombre del modelo.
+        self.image_path = os.path.join(image_path, model_type.value)
+        os.makedirs(self.image_path, exist_ok=True)
+        print(f"Directorio de imágenes: {self.image_path}")
+
+        self.early_stopping_patience = early_stopping_patience
 
     def train_epoch(self, epoch):
         """
@@ -142,8 +167,8 @@ class DiffussionTrainer:
             torch.save(self.model.state_dict(), checkpoint_path)
             print(f"Modelo guardado para la época {epoch} en {checkpoint_path}")
             # Generar y guardar una muestra (1 sample) para la época actual
-            sample = self.model.sampling(1, clipped_reverse_diffusion=True, device=self.device)
-            sample_path = os.path.join(TRAIN_DIFUSSION_SAMPLES_DIR, f"epoch_{epoch}.png")
+            sample = self.model.sampling(9, clipped_reverse_diffusion=True, device=self.device)
+            sample_path = os.path.join(self.image_path, f"epoch_{epoch}.png")
             save_image(sample, sample_path, nrow=1, normalize=True)
             print(f"Muestra guardada en {sample_path}")
             # Early stopping: si no hay mejora en la pérdida de validación, incrementar el contador.

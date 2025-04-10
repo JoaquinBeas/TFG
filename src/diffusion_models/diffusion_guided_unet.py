@@ -4,16 +4,16 @@ from src.utils.config import *
 from src.utils.unet_guided import UNetModel
 from src.utils.gaussian_diffusion import *
 
-class DifussionGuidedUnet(nn.Module):
+class DiffusionGuidedUnet(nn.Module):
     def __init__(
         self,
         image_size=MODEL_IMAGE_SIZE,
         in_channels=MODEL_IN_CHANNELS,
         timesteps=TIMESTEPS,
-        model_channels=MODEL_BASE_DIM,  # using your config base dimension
+        model_channels=MODEL_BASE_DIM,
         out_channels=MODEL_IN_CHANNELS,
         num_res_blocks=2,
-        attention_resolutions=[4],  # Adjust as needed
+        attention_resolutions=[4], 
         dropout=0,
         channel_mult=MODEL_DIM_MULTS,
         conv_resample=True,
@@ -27,11 +27,10 @@ class DifussionGuidedUnet(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
-        **kwargs  # To accept extra unused parameters
+        **kwargs
     ):
         super().__init__()
         self.timesteps = timesteps
-        # Instantiate the guided UNet
         self.unet = UNetModel(
             image_size=image_size,
             in_channels=in_channels,
@@ -53,12 +52,11 @@ class DifussionGuidedUnet(nn.Module):
             resblock_updown=resblock_updown,
             use_new_attention_order=use_new_attention_order,
         )
-        # Precompute the beta schedule once.
         betas = get_named_beta_schedule("cosine", self.timesteps)
         self.diffusion = GaussianDiffusion(
             betas=betas,
-            model_mean_type=ModelMeanType.EPSILON,   # assuming your model predicts epsilon
-            model_var_type=ModelVarType.FIXED_SMALL,   # adjust as needed
+            model_mean_type=ModelMeanType.EPSILON,
+            model_var_type=ModelVarType.FIXED_SMALL,
             loss_type=LossType.MSE,
             rescale_timesteps=True,
         )

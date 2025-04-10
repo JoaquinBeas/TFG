@@ -3,60 +3,76 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
-
 from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, MNIST_PATIENCE, TRAIN_MNIST_MODEL_DIR
-from src.utils.data_loader import get_mnist_dataloaders
-from src.mnist_models.mnist_simple_cnn import MNISTCNN
+# Importamos ambas funciones para cargar los datasets:
+from src.utils.data_loader import get_mnist_dataloaders, get_synthetic_mnist_dataloaders
+from src.utils.diffusion_models_enum import MNISTModelType
 
 class MnistTrainer:
-    def __init__(self, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE,
-                 model_name="mnist_cnn", early_stopping_patience=MNIST_PATIENCE):
+    def __init__( self, model_type: MNISTModelType = MNISTModelType.SIMPLE_CNN, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE, early_stopping_patience=MNIST_PATIENCE, model_path=TRAIN_MNIST_MODEL_DIR, use_synthetic_dataset: bool = False):
         """
         Inicializa el entrenador configurando el dispositivo, los dataloaders,
         el modelo, el optimizador y la función de pérdida.
-        
-        Además, crea el directorio para guardar los checkpoints del modelo.
-        Se realiza una división del conjunto de entrenamiento, usando 85% para
-        entrenamiento y 15% para validación (early stopping).
-        
+        Se crea el directorio para guardar los checkpoints del modelo.
+        Se realiza una división del conjunto de entrenamiento: 85% para entrenamiento y 15% para validación (early stopping).
+
         Args:
+            model_type (MNISTModelType): Enum que indica qué modelo entrenar.
             num_epochs (int): Número de épocas de entrenamiento.
             learning_rate (float): Tasa de aprendizaje para el optimizador.
             batch_size (int): Tamaño de lote para el entrenamiento.
-            model_name (str): Nombre del modelo, usado para crear la carpeta de checkpoints.
-            early_stopping_patience (int): Número de épocas sin mejora en la pérdida de validación
-                                           antes de detener el entrenamiento.
+            early_stopping_patience (int): Número de épocas sin mejora en la pérdida de validación antes de detener el entrenamiento.
+            model_path (str): Ruta base para guardar los checkpoints.
+            use_synthetic_dataset (bool): Si es True se utilizará el dataset sintético en lugar del dataset original de MNIST.
         """
         self.device = torch.device(DEVICE)
         
-        # Obtener el dataloader completo para entrenamiento y el test_loader
-        full_train_loader, self.test_loader = get_mnist_dataloaders(batch_size=batch_size)
+        # Cargar el dataset utilizando el método correspondiente
+        if use_synthetic_dataset:
+            print("Cargando dataset sintético...")
+            full_train_loader, test_loader = get_synthetic_mnist_dataloaders(batch_size=batch_size)
+            # full_train_loader.dataset es el dataset completo obtenido por la función get_synthetic_mnist_dataloaders
+            full_train_dataset = full_train_loader.dataset
+        else:
+            print("Cargando dataset MNIST original...")
+            full_train_loader, test_loader = get_mnist_dataloaders(batch_size=batch_size)
+            full_train_dataset = full_train_loader.dataset
         
-        # Se extrae el dataset completo de entrenamiento para crear la división (85% train, 15% validación)
-        train_dataset = full_train_loader.dataset
-        train_size = int(0.85 * len(train_dataset))
-        val_size = len(train_dataset) - train_size
-        train_subset, val_subset = random_split(train_dataset, [train_size, val_size])
+        self.test_loader = test_loader
+        
+        # Dividir el dataset de entrenamiento en 85% para entrenamiento y 15% para validación
+        total_len = len(full_train_dataset)
+        train_size = int(0.85 * total_len)
+        val_size = total_len - train_size
+        train_subset, val_subset = random_split(full_train_dataset, [train_size, val_size])
         self.train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
-        self.val_loader   = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
+        self.val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
         
-        self.model = MNISTCNN().to(self.device)
+        # Seleccionar e instanciar el modelo según el enum
+        if model_type == MNISTModelType.SIMPLE_CNN:
+            from src.mnist_models.mnist_simple_cnn import MNISTCNN
+            self.model = MNISTCNN().to(self.device)
+        elif model_type == MNISTModelType.COMPLEX_CNN:
+            from src.mnist_models.mnist_complex_cnn import MNISTNet1
+            self.model = MNISTNet1().to(self.device)
+        else:
+            raise ValueError("Modelo MNIST desconocido.")
+        
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.CrossEntropyLoss()
-        self.model_name = model_name
         self.early_stopping_patience = early_stopping_patience
         
-        # Crear el directorio para almacenar los checkpoints del modelo
-        self.checkpoint_dir = os.path.join(TRAIN_MNIST_MODEL_DIR, self.model_name)
+        # Crear el directorio para almacenar los checkpoints del modelo basado en el valor del enum
+        self.checkpoint_dir = os.path.join(model_path, model_type.value)
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         print(f"Directorio de checkpoints: {self.checkpoint_dir}")
     
     def train_epoch(self, epoch):
         """
         Ejecuta el entrenamiento del modelo para una única época.
-        
+
         Args:
             epoch (int): Número de la época actual (para visualización).
         """
@@ -70,16 +86,16 @@ class MnistTrainer:
             self.optimizer.step()
             
             if batch_idx % 100 == 0:
-                print(f"Epoch {epoch} Batch {batch_idx}/{len(self.train_loader)} - Loss: {loss.item():.6f}")
+                print(f"Época {epoch} Batch {batch_idx}/{len(self.train_loader)} - Loss: {loss.item():.6f}")
     
     def evaluate_on_loader(self, loader, loader_name="Validation"):
         """
-        Evalúa el modelo en el loader que se especifique (puede ser el de validación o test).
-        
+        Evalúa el modelo en el DataLoader especificado (validación o test).
+
         Args:
             loader (DataLoader): DataLoader a evaluar.
             loader_name (str): Nombre descriptivo para el loader.
-            
+        
         Returns:
             tuple: (avg_loss, accuracy) para el loader evaluado.
         """
@@ -105,11 +121,10 @@ class MnistTrainer:
 
     def train_model(self):
         """
-        Ejecuta el ciclo completo de entrenamiento y evaluación usando early stopping basado en
-        la pérdida de validación. Después de cada época, guarda un checkpoint del modelo y,
-        al finalizar el entrenamiento (por early stopping o completando las épocas), guarda
-        el modelo final como 'last_model.pt'.
-        
+        Ejecuta el ciclo completo de entrenamiento y evaluación usando early stopping basado en la pérdida de validación.
+        Después de cada época, guarda un checkpoint del modelo. Al finalizar el entrenamiento (por early stopping o completando todas las épocas),
+        guarda el modelo final como 'last_model.pt'.
+
         Returns:
             tuple: (avg_loss_test, accuracy_test) evaluados sobre el conjunto de test.
         """

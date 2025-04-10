@@ -14,9 +14,10 @@ USE_CPU = False
 MNIST_DATA_LOADERS_DIR = os.path.join("src", "data", "mnist_data")
 DATA_DIR = os.path.join("src", "data")
 TRAIN_MNIST_MODEL_DIR = os.path.join("src", "data","train_mnist_model")
-TRAIN_DIFUSSION_MODEL_DIR = os.path.join("src", "data","train_difussion_model")
-TRAIN_DIFUSSION_SAMPLES_DIR = os.path.join("src", "data","train_difussion_sample")
-
+TRAIN_MNIST_MODEL_COPY_DIR = os.path.join("src", "data","train_mnist_model_copy")
+TRAIN_DIFFUSION_MODEL_DIR = os.path.join("src", "data","train_diffusion_model")
+TRAIN_DIFFUSION_SAMPLES_DIR = os.path.join("src", "data","train_diffusion_sample")
+SAVE_SYNTHETIC_DATASET_DIR = os.path.join("src", "data","dataset")
 # Constantes utils
 BATCH_SIZE = 128
 NUM_WORKERS = 4

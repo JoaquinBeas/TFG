@@ -25,8 +25,16 @@ class DiffusionResnet(nn.Module):
 
         # Backbone ResNet; en este ejemplo usamos resnet18.
         # Nota: Si tus imágenes son de 1 canal, adapta la primera capa de resnet18 o replica el canal.
+
         self.backbone = resnet18(num_classes=feature_dim)
-        
+        self.backbone.conv1 = nn.Conv2d(
+            in_channels=1,         # Cambia de 3 a 1 canal
+            out_channels=64,       # Mantiene el mismo número de filtros
+            kernel_size=7,         # Tamaño de kernel igual al original
+            stride=2,
+            padding=3,
+            bias=False
+        )
         # Capas adicionales para transformar la representación extraída.
         self.fc1 = nn.Linear(feature_dim, feature_dim)
         self.fc2 = nn.Linear(feature_dim, feature_dim)
@@ -61,8 +69,8 @@ class DiffusionResnet(nn.Module):
         Se asume que x0 es la representación extraída (vector de dimensión feature_dim).
         """
         # t es un tensor de enteros [B] que indica el paso para cada muestra.
-        sqrt_ac = self.sqrt_alphas_cumprod.gather(-1, t.view(-1, 1)).view(-1, 1)
-        sqrt_one_minus_ac = self.sqrt_one_minus_alphas_cumprod.gather(-1, t.view(-1, 1)).view(-1, 1)
+        sqrt_ac = self.sqrt_alphas_cumprod[t].view(-1, 1)
+        sqrt_one_minus_ac = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1)
         return sqrt_ac * x0 + sqrt_one_minus_ac * noise
 
     def forward(self, x, noise):
@@ -114,10 +122,10 @@ class DiffusionResnet(nn.Module):
             # Obtener predicción de ruido en el estado actual.
             pred_noise = self.noise_predictor(latent)
             # Extraer valores necesarios del schedule.
-            alpha_t = self.alphas.gather(-1, t.view(-1, 1)).sqrt()
-            sqrt_one_minus_alpha_t = self.sqrt_one_minus_alphas_cumprod.gather(-1, t.view(-1, 1))
+            alpha_t = self.alphas[t].sqrt().view(-1, 1)
+            sqrt_one_minus_alpha_t = self.sqrt_one_minus_alphas_cumprod[t].view(-1, 1)
             # Reverse diffusion: aproximación simple.
-            latent = (1.0 / alpha_t) * (latent - ((1 - self.alphas.gather(-1, t.view(-1, 1))) / sqrt_one_minus_alpha_t) * pred_noise)
+            latent = (1.0 / alpha_t) * (latent - ((1 - self.alphas[t].view(-1, 1)) / sqrt_one_minus_alpha_t) * pred_noise)
             # Si no es el último paso, agregar ruido.
             if i > 0:
                 latent = latent + noise

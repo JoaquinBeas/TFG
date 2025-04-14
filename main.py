@@ -10,10 +10,10 @@ def main():
     # Variables de configuración
     train_mnist = False       # True: entrena el modelo MNIST; False: carga el modelo guardado.
     train_diffusion = False   # True: entrena el modelo de difusión; False: carga el modelo guardado.
-    train_diffusion_copy = False   # True: entrena el modelo de difusión; False: carga el modelo guardado.
+    train_diffusion_copy = True   # True: entrena el modelo de difusión; False: carga el modelo guardado.
     
-    mnist_model_name = "mnist_complex_cnn"             # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
-    diffusion_model_name = "diffusion_guided_unet"  # Opciones: "diffusion_guided_unet", "diffusion_resnet" o "diffusion_unet"
+    mnist_model_name = "mnist_complex_cnn"          # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
+    diffusion_model_name = "diffusion_unet"         # Opciones: "diffusion_guided_unet", "diffusion_resnet" o "diffusion_unet"
     mnist_model_name_copy = "mnist_cnn"             # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
 
     # Seleccionar el modelo MNIST basándonos en la variable definida.
@@ -47,7 +47,7 @@ def main():
         print("Entrenando modelo MNIST...")
         trainer_mnist = MnistTrainer(
             model_type=selected_mnist_model,
-            num_epochs=10,
+            num_epochs=20,
             learning_rate=0.002,
             batch_size=64
         )
@@ -72,10 +72,10 @@ def main():
         print("Entrenando modelo de difusión...")
         trainer_diffusion = DiffussionTrainer(
             model_type=selected_diffusion_model,
-            num_epochs=10,
-            learning_rate=0.002,
+            num_epochs=120,
+            learning_rate=0.001,
             batch_size=64,
-            early_stopping_patience=3
+            early_stopping_patience=100
         )
         avg_loss_test = trainer_diffusion.train_model()
         print(f"Entrenamiento de difusión finalizado. Pérdida en Test: {avg_loss_test:.6f}")
@@ -100,13 +100,19 @@ def main():
         model_diffusion.load_state_dict(torch.load(diffusion_checkpoint_path, map_location=torch.device(DEVICE)))
         model_diffusion.eval()
         print(f"Modelo de difusión cargado desde: {diffusion_checkpoint_path}")
+    print("Generando dataset sintético...")
 
+    # Crear una instancia de SyntheticDataset utilizando el modelo de difusión y el teacher MNIST.
+    synthetic_dataset_generator = SyntheticDataset(model_diffusion, model_mnist)
+
+    # Generar, por ejemplo, 1000 muestras; ajusta el número de muestras según tus necesidades.
+    synthetic_dataset = synthetic_dataset_generator.generate_dataset(n_samples=1000)
     # ----- MODELO MNIST ----- Student
     if train_diffusion_copy:
         print("Entrenando modelo MNIST...")
         trainer_mnist = MnistTrainer(
             model_type=selected_mnist_model_copy,
-            num_epochs=10,
+            num_epochs=20,
             learning_rate=0.002,
             batch_size=64,
             model_path=TRAIN_MNIST_MODEL_COPY_DIR,

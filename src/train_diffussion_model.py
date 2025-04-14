@@ -94,8 +94,17 @@ class DiffussionTrainer:
         self.model.train()
         for batch_idx, (data, _) in enumerate(self.train_loader):
             data = data.to(self.device)
+            # Dentro del ciclo de entrenamiento, en lugar de:
             noise = torch.randn_like(data)
-            
+
+            # Se podría hacer:
+            if isinstance(self.model, DiffusionResnet):
+                batch_size = data.size(0)
+                # Usar el feature_dim que se espera (512 por defecto)
+                noise = torch.randn(batch_size, 512, device=self.device)
+            else:
+                noise = torch.randn_like(data)
+
             self.optimizer.zero_grad()
             predicted_noise = self.model(data, noise)
             loss = self.criterion(predicted_noise, noise)
@@ -124,6 +133,14 @@ class DiffussionTrainer:
             for data, _ in loader:
                 data = data.to(self.device)
                 noise = torch.randn_like(data)
+
+                # Se podría hacer:
+                if isinstance(self.model, DiffusionResnet):
+                    batch_size = data.size(0)
+                    # Usar el feature_dim que se espera (512 por defecto)
+                    noise = torch.randn(batch_size, 512, device=self.device)
+                else:
+                    noise = torch.randn_like(data)                
                 predicted_noise = self.model(data, noise)
                 loss = self.criterion(predicted_noise, noise)
                 total_loss += loss.item() * data.size(0)

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class ChannelShuffle(nn.Module):
     def __init__(self,groups):
@@ -108,15 +109,15 @@ class DecoderBlock(nn.Module):
         self.time_mlp=TimeMLP(embedding_dim=time_embedding_dim,hidden_dim=in_channels,out_dim=in_channels//2)
         self.conv1=ResidualBottleneck(in_channels//2,out_channels//2)
 
-    def forward(self,x,x_shortcut,t=None):
-        x=self.upsample(x)
-        x=torch.cat([x,x_shortcut],dim=1)
-        x=self.conv0(x)
+    def forward(self, x, x_shortcut, t=None):
+        # Usa F.interpolate para hacer upsample especificando el tamaño del skip connection
+        x = F.interpolate(x, size=x_shortcut.shape[2:], mode='bilinear', align_corners=False)
+        x = torch.cat([x, x_shortcut], dim=1)
+        x = self.conv0(x)
         if t is not None:
-            x=self.time_mlp(x,t)
-        x=self.conv1(x)
-
-        return x        
+            x = self.time_mlp(x, t)
+        x = self.conv1(x)
+        return x
 
 class Unet(nn.Module):
     '''

@@ -8,19 +8,21 @@ from src.utils.config import DEVICE, TRAIN_DIFFUSION_MODEL_DIR, TRAIN_MNIST_MODE
 
 def main():
     # Variables de configuración
-    train_mnist = False       # True: entrena el modelo MNIST; False: carga el modelo guardado.
+    train_mnist = True       # True: entrena el modelo MNIST; False: carga el modelo guardado.
     train_diffusion = False   # True: entrena el modelo de difusión; False: carga el modelo guardado.
-    train_diffusion_copy = True   # True: entrena el modelo de difusión; False: carga el modelo guardado.
+    train_diffusion_copy = False   # True: entrena el modelo de difusión; False: carga el modelo guardado.
     
-    mnist_model_name = "mnist_complex_cnn"          # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
+    mnist_model_name = "decision_tree"          # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
     diffusion_model_name = "diffusion_unet"         # Opciones: "diffusion_guided_unet", "diffusion_resnet" o "diffusion_unet"
-    mnist_model_name_copy = "mnist_cnn"             # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
+    mnist_model_name_copy = "mnist_complex_cnn"             # Opciones: "mnist_cnn" (modelo simple) o "mnist_complex_cnn" (modelo complejo)
 
     # Seleccionar el modelo MNIST basándonos en la variable definida.
     if mnist_model_name.lower() == "mnist_cnn":
         selected_mnist_model = MNISTModelType.SIMPLE_CNN
     elif mnist_model_name.lower() == "mnist_complex_cnn":
         selected_mnist_model = MNISTModelType.COMPLEX_CNN
+    elif mnist_model_name.lower() == "decision_tree":
+        selected_mnist_model = MNISTModelType.DECISION_TREE
     else:
         raise ValueError("Nombre de modelo MNIST desconocido.")
 
@@ -39,6 +41,8 @@ def main():
         selected_mnist_model_copy = MNISTModelType.SIMPLE_CNN
     elif mnist_model_name_copy.lower() == "mnist_complex_cnn":
         selected_mnist_model_copy = MNISTModelType.COMPLEX_CNN
+    elif mnist_model_name.lower() == "decision_tree":
+        selected_mnist_model = MNISTModelType.DECISION_TREE
     else:
         raise ValueError("Nombre de modelo MNIST desconocido.")
 
@@ -106,7 +110,10 @@ def main():
     synthetic_dataset_generator = SyntheticDataset(model_diffusion, model_mnist)
 
     # Generar, por ejemplo, 1000 muestras; ajusta el número de muestras según tus necesidades.
-    synthetic_dataset = synthetic_dataset_generator.generate_dataset(n_samples=1000)
+    # synthetic_dataset = synthetic_dataset_generator.generate_dataset(n_samples=1000)
+    # synthetic_dataset = synthetic_dataset_generator.generate_balanced_dataset()
+    synthetic_dataset = synthetic_dataset_generator.generate_balanced_dataset(max_per_class=100) # test
+
     # ----- MODELO MNIST ----- Student
     if train_diffusion_copy:
         print("Entrenando modelo MNIST...")

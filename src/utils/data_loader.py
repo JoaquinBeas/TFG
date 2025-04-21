@@ -7,6 +7,7 @@ from src.utils.config import BATCH_SIZE, IMAGE_SIZE, MNIST_DATA_LOADERS_DIR, NUM
 
 def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=IMAGE_SIZE, num_workers=NUM_WORKERS):
     preprocess = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),
         transforms.Resize(image_size),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])

@@ -55,14 +55,20 @@ class MnistTrainer:
         elif model_type == MNISTModelType.COMPLEX_CNN:
             from src.mnist_models.mnist_complex_cnn import MNISTNet1
             self.model = MNISTNet1().to(self.device)
+        elif model_type == MNISTModelType.DECISION_TREE:
+            from src.mnist_models.mnist_decision_tree import MNISTDecisionTree
+            self.model = MNISTDecisionTree(max_depth=40)  # o lo que quieras
         else:
             raise ValueError("Modelo MNIST desconocido.")
-        
-        self.num_epochs = num_epochs
+        if model_type == MNISTModelType.DECISION_TREE:
+            self.num_epochs = 1
+            self.early_stopping_patience = 0
+        else:
+            self.num_epochs = num_epochs
+            self.early_stopping_patience = early_stopping_patience
         self.learning_rate = learning_rate
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.CrossEntropyLoss()
-        self.early_stopping_patience = early_stopping_patience
         
         # Crear el directorio para almacenar los checkpoints del modelo basado en el valor del enum
         self.checkpoint_dir = os.path.join(model_path, model_type.value)

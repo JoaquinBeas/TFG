@@ -149,7 +149,6 @@ class SyntheticDataset:
             # 5) Filtrar, contar y guardar
             samples_cpu = samples.cpu()
             for i, (img, p, conf) in enumerate(zip(samples_cpu, preds, confidences)):
-                print("confianza",conf)
                 if conf < confidence_threshold:
                     continue
                 cls = int(p)

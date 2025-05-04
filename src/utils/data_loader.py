@@ -1,5 +1,9 @@
+import gzip
+import os
+import struct
+import numpy as np
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import TensorDataset, DataLoader, random_split
 from torchvision.datasets import MNIST, ImageFolder
 from torchvision import transforms
 
@@ -21,25 +25,51 @@ def get_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=IMAGE_SIZE, num_work
     
     return train_loader, test_loader
 
-def get_synthetic_mnist_dataloaders(batch_size=BATCH_SIZE, image_size=IMAGE_SIZE, num_workers=NUM_WORKERS, synthetic_data_dir=None):
+def get_synthetic_mnist_dataloaders(
+    batch_size=BATCH_SIZE,
+    image_size=IMAGE_SIZE,
+    num_workers=NUM_WORKERS,
+    synthetic_data_dir=None
+):
     if synthetic_data_dir is None:
         synthetic_data_dir = SAVE_SYNTHETIC_DATASET_DIR
 
-    transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),
-        transforms.Resize(image_size),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
-    ])
+    # 1) Load IDX-gzip files directly
+    img_path = os.path.join(synthetic_data_dir, "train-images-idx3-ubyte.gz")
+    with gzip.open(img_path, "rb") as f:
+        magic, n, h, w = struct.unpack(">IIII", f.read(16))
+        buf = f.read(n * h * w)
+    images = np.frombuffer(buf, dtype=np.uint8).reshape(n, 1, h, w)
 
-    dataset = ImageFolder(root=synthetic_data_dir, transform=transform)
-    total_len = len(dataset)
-    train_size = int(0.85 * total_len)
-    test_size = total_len - train_size
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-    
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    lbl_path = os.path.join(synthetic_data_dir, "train-labels-idx1-ubyte.gz")
+    with gzip.open(lbl_path, "rb") as f:
+        magic, n2 = struct.unpack(">II", f.read(8))
+        labels = np.frombuffer(f.read(n2), dtype=np.uint8)
+    assert n == n2, "Mismatch between image and label count"
+
+    # 2) Convert to torch tensors and normalize to [-1,1]
+    imgs_t = torch.from_numpy(images).float().div(255.0).mul(2).sub(1)  # [N,1,H,W] in [-1,1]
+    lbls_t = torch.from_numpy(labels).long()
+
+    # 3) Build a TensorDataset
+    full_ds = TensorDataset(imgs_t, lbls_t)
+
+    # 4) Split into train/test
+    total = len(full_ds)
+    train_len = int(0.85 * total)
+    test_len  = total - train_len
+    train_ds, test_ds = random_split(full_ds, [train_len, test_len])
+
+    # 5) DataLoaders
+    train_loader = DataLoader(train_ds,
+                              batch_size=batch_size,
+                              shuffle=True,
+                              num_workers=num_workers)
+    test_loader = DataLoader(test_ds,
+                             batch_size=batch_size,
+                             shuffle=False,
+                             num_workers=num_workers)
+
     return train_loader, test_loader
 
 def get_mnist_prototypes():

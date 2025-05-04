@@ -26,7 +26,7 @@ def main():
     # Nombres de modelo (strings)
     mnist_model_name = "resnet_preact"       # mnist_cnn, mnist_complex_cnn, decision_tree, resnet_preact
     diffusion_model_name = "conditional_unet"  # diffusion_guided_unet, diffusion_resnet, diffusion_unet, conditional_unet
-    mnist_model_name_copy = "mnist_complex_cnn"
+    mnist_model_name_copy = "resnet_preact"
 
     # ----- MNIST TEACHER -----
     if mnist_model_name.lower() == "mnist_cnn":

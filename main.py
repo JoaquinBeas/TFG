@@ -19,8 +19,9 @@ from src.utils.config import (
 def main():
     # Flags de ejecución
     train_mnist = False
-    train_diffusion = True
-    train_diffusion_copy = False
+    train_diffusion = False
+    train_diffusion_copy = True
+    gemerate_synthetic_dataset = False
 
     # Nombres de modelo (strings)
     mnist_model_name = "resnet_preact"       # mnist_cnn, mnist_complex_cnn, decision_tree, resnet_preact
@@ -78,8 +79,33 @@ def main():
         model_mnist = trainer_mnist.get_model()
     else:
         print("Cargando MNIST teacher desde checkpoint...")
-        # ... mismo bloque de carga existente ...
-
+        if selected_mnist_model == MNISTModelType.SIMPLE_CNN:
+            from src.mnist_models.mnist_simple_cnn import MNISTCNN
+            model_mnist = MNISTCNN()
+        elif selected_mnist_model == MNISTModelType.COMPLEX_CNN:
+            from src.mnist_models.mnist_complex_cnn import MNISTNet1
+            model_mnist = MNISTNet1()
+        elif selected_mnist_model == MNISTModelType.RESNET_PREACT:
+            from src.mnist_models.resnet_preact import ResNetPreAct
+            # Inline config mínimo
+            class Cfg: pass
+            cfg = Cfg(); cfg.model = Cfg()
+            cfg.model.in_channels = 1
+            cfg.model.n_classes = 10
+            cfg.model.base_channels = 16
+            cfg.model.block_type = 'basic'
+            cfg.model.depth = 20
+            cfg.model.remove_first_relu = False
+            cfg.model.add_last_bn = False
+            cfg.model.preact_stage = [True, True, True]
+            model_mnist = ResNetPreAct(cfg)
+        else:
+            from src.mnist_models.mnist_decision_tree import MNISTDecisionTree
+            model_mnist = MNISTDecisionTree(max_depth=40)
+        checkpoint = os.path.join(TRAIN_MNIST_MODEL_DIR, selected_mnist_model.value, "last_model.pt")
+        model_mnist.load_state_dict(torch.load(checkpoint, map_location=torch.device(DEVICE)))
+        model_mnist.eval()
+        print(f"MNIST Teacher cargado desde: {checkpoint}")
     # ----- MODELO DIFUSIÓN -----
     if train_diffusion:
         print("Entrenando modelo de difusión...")
@@ -110,29 +136,54 @@ def main():
             )
         elif selected_diffusion_model == DiffusionModelType.CONDITIONAL_UNET:
             from src.diffusion_models.diffusion_unet_conditional import ConditionalDiffusionModel
-            model_diffusion = ConditionalDiffusionModel(
-                image_size=MODEL_IMAGE_SIZE,
-                in_channels=MODEL_IN_CHANNELS,
-                num_classes=MNIST_N_CLASSES,
-                timesteps=TIMESTEPS,
-                device=DEVICE
-            )
+            model_diffusion = ConditionalDiffusionModel()
         else:
             raise ValueError(f"Modelo de difusión desconocido: {diffusion_model_name}")
         ckpt = os.path.join(TRAIN_DIFFUSION_MODEL_DIR, selected_diffusion_model.value, "last_model.pt")
         model_diffusion.load_state_dict(torch.load(ckpt, map_location=torch.device(DEVICE)))
         model_diffusion.eval()
         print(f"Difusión cargada desde: {ckpt}")
-
-    # ----- GENERAR DATASET SINTÉTICO -----
-    print("Generando dataset sintético...")
-    synthetic_dataset = SyntheticDataset(model_diffusion, model_mnist)
-    synthetic_dataset.generate_balanced_dataset(max_per_class=100)
+    if gemerate_synthetic_dataset:
+        # ----- GENERAR DATASET SINTÉTICO -----
+        print("Generando dataset sintético...")
+        synthetic_dataset = SyntheticDataset(model_diffusion, model_mnist)
+        synthetic_dataset.generate_balanced_dataset(max_per_class=100)
 
     # ----- MODELO MNIST STUDENT -----
     if train_diffusion_copy:
         print("Entrenando modelo MNIST student...")
-        # ... mismo bloque existente ...
-
+        trainer_student = MnistTrainer(
+            model_type=selected_mnist_model_copy,
+            num_epochs=20,
+            learning_rate=0.002,
+            batch_size=64,
+            model_path=TRAIN_MNIST_MODEL_COPY_DIR,
+            use_synthetic_dataset=True
+        )
+        avg_loss_s, acc_s = trainer_student.train_model()
+        print(f"MNIST Student: Pérdida={avg_loss_s:.4f}, Precisión={acc_s:.2f}%")
+    else:
+        print("Cargando MNIST student desde checkpoint...")
+        if selected_mnist_model_copy == MNISTModelType.SIMPLE_CNN:
+            from src.mnist_models.mnist_simple_cnn import MNISTCNN
+            model_student = MNISTCNN()
+        elif selected_mnist_model_copy == MNISTModelType.COMPLEX_CNN:
+            from src.mnist_models.mnist_complex_cnn import MNISTNet1
+            model_student = MNISTNet1()
+        elif selected_mnist_model_copy == MNISTModelType.RESNET_PREACT:
+            from src.mnist_models.resnet_preact import ResNetPreAct
+            cfg = Cfg(); cfg.model = Cfg()
+            cfg.model.in_channels = 1; cfg.model.n_classes = 10
+            cfg.model.base_channels = 16; cfg.model.block_type = 'basic'
+            cfg.model.depth = 20; cfg.model.remove_first_relu = False
+            cfg.model.add_last_bn = False; cfg.model.preact_stage = [True,True,True]
+            model_student = ResNetPreAct(cfg)
+        else:
+            from src.mnist_models.mnist_decision_tree import MNISTDecisionTree
+            model_student = MNISTDecisionTree(max_depth=40)
+        ckpt_s = os.path.join(TRAIN_MNIST_MODEL_COPY_DIR, selected_mnist_model_copy.value, "last_model.pt")
+        model_student.load_state_dict(torch.load(ckpt_s, map_location=torch.device(DEVICE)))
+        model_student.eval()
+        print(f"MNIST Student cargado desde: {ckpt_s}")
 if __name__ == "__main__":
     main()

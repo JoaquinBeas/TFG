@@ -97,68 +97,66 @@ class ConditionalDiffusionModel(nn.Module):
             return x_i, x_i_store
     @torch.no_grad()
     def sampling(self,
-                 n_samples: int,
-                 labels: Optional[torch.LongTensor] = None,
-                 device: str = DEVICE,
-                 guide_w: float = 0.5,
-                 x_t_scale: float = 1.0,
-                 noise_scale: float = 1.0) -> torch.Tensor:
+             n_samples: int,
+             labels: Optional[torch.LongTensor] = None,
+             device: str = DEVICE,
+             guide_w: float = 0.5,
+             x_t_scale: float = 1.0,
+             noise_scale: float = 1.0) -> torch.Tensor:
         """
-        Genera `n_samples` condicionados a `labels` usando Classifier-Free Diffusion Guidance.
-        - Si `labels` es None, se muestrean aleatoriamente en [0, num_classes).
-        - `guide_w` controla la fuerza de la guía (w ≥ 0).
-        - `x_t_scale` escala el ruido inicial x_T.
-        - `noise_scale` escala el ruido añadido en cada paso (si t > 0).
-        Retorna: Tensor de forma (n_samples, 1, 28, 28) en [0,1].
+        Reverse‐diffusion sampler con Classifier‐Free Guidance.
+        - n_samples: número de imágenes a generar.
+        - labels: LongTensor (n_samples,) con valores [0, num_classes). Si es None, se generan aleatorias.
+        - guide_w: fuerza del guidance (w ≥ 0).
+        - x_t_scale: escala del ruido inicial x_T.
+        - noise_scale: escala del ruido añadido en cada paso (si t > 1).
+        Retorna: Tensor (n_samples, 1, 28, 28) con valores en [0,1].
         """
         self.nn_model.eval()
+
+        # — Labels: aleatorias si no se pasan —
         if labels is None:
-            labels = torch.randint(
-                0,
-                self.num_classes,
-                (n_samples,),
-                device=device,
-                dtype=torch.long
-            )
+            labels = torch.randint(0,
+                                self.num_classes,
+                                (n_samples,),
+                                device=device,
+                                dtype=torch.long)
         else:
             labels = labels.to(device)
-        x_i = torch.randn(
-            n_samples,
-            *self.image_size,
-            device=device
-        ) * x_t_scale
-        t_steps = torch.arange(
-            self.n_T - 1,
-            -1,
-            -1,
-            device=device,
-            dtype=torch.long
-        )
-        alpha_sqrt = self.alphas.sqrt()                   
-        one_minus_alpha_cumprod_sqrt = self.sqrt_one_minus_alphas_cumprod
-        for t in t_steps:
-            mask_ctx = torch.zeros_like(labels, dtype=torch.float, device=device)
-            mask_noc = torch.ones_like(labels,  dtype=torch.float, device=device)
 
-            t_norm = (t / (self.n_T - 1)).view(1,1,1,1)
-            t_emb  = t_norm.repeat(n_samples, 1, 1, 1)
+        # — Ruido inicial en x_T —
+        x = torch.randn(n_samples, *(1,28,28), device=device) * x_t_scale
 
-            eps_ctx   = self.nn_model(x_i, labels, t_emb, mask_ctx)
-            eps_noctx = self.nn_model(x_i, labels, t_emb, mask_noc)
+        # — Reverse diffusion paso a paso —
+        for t in range(self.n_T, 0, -1):
+            # embedding de timestep normalizado a [0,1]
+            t_norm = torch.full((n_samples,1,1,1),
+                                float(t) / self.n_T,
+                                device=device)
 
+            # máscaras para guidance
+            mask_ctx = torch.zeros(n_samples, device=device)
+            mask_noc = torch.ones(n_samples,  device=device)
+
+            # 1) predecir ruido con contexto y sin contexto
+            eps_ctx   = self.nn_model(x, labels, t_norm, mask_ctx)
+            eps_noctx = self.nn_model(x, labels, t_norm, mask_noc)
+
+            # 2) mezclar según guide_w
             eps = (1 + guide_w) * eps_ctx - guide_w * eps_noctx
 
-            alpha_t = alpha_sqrt[t].view(-1,1,1,1)
-            sqrt_1m_alpha = one_minus_alpha_cumprod_sqrt[t].view(-1,1,1,1)
-            x_prev = (1.0 / alpha_t) * (
-                x_i
-                - ((1.0 - self.alphas[t]).view(-1,1,1,1) / sqrt_1m_alpha) * eps
-            )
+            # 3) actualizar x_{t-1} según DDPM:
+            #    x_{t-1} = 1/√α_t ( x_t – (1–α_t)/√(1–ᾱ_t) · ε ) + √β_t · z
+            inv_sqrt_alpha   = self.oneover_sqrta[t].view(1,1,1,1)
+            coef             = self.mab_over_sqrtmab[t].view(1,1,1,1)
+            beta_sqrt        = self.sqrt_beta_t[t].view(1,1,1,1)
 
-            if t > 0:
-                noise = torch.randn_like(x_i, device=device) * noise_scale
-                x_i = x_prev + noise
-            else:
-                x_i = x_prev
-        images = (x_i.clamp(-1,1) + 1) / 2.0
+            x = inv_sqrt_alpha * (x - coef * eps)
+
+            # añadir ruido extra si no es el último paso
+            if t > 1:
+                x = x + beta_sqrt * torch.randn_like(x, device=device) * noise_scale
+
+        # Mapear de [–1,1] a [0,1]
+        images = (x.clamp(-1,1) + 1) * 0.5
         return images

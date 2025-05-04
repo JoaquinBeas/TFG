@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
@@ -48,7 +49,7 @@ class ConditionalDiffusionModel(nn.Module):
     def p_losses(self, x, c):
         return self.forward(x, c)
 
-    def sample(self, labels, n_sample, size=(1, 28, 28), device=DEVICE, guide_w = 0.0):
+    def sample(self, labels, n_sample, size=(1, 28, 28), device=DEVICE, guide_w = 0.5):
         # we follow the guidance sampling scheme described in 'Classifier-Free Diffusion Guidance'
         # to make the fwd passes efficient, we concat two versions of the dataset,
         # one with context_mask=0 and the other context_mask=1
@@ -94,3 +95,70 @@ class ConditionalDiffusionModel(nn.Module):
             torch.cuda.empty_cache()
             x_i_store = np.array(x_i_store)
             return x_i, x_i_store
+    @torch.no_grad()
+    def sampling(self,
+                 n_samples: int,
+                 labels: Optional[torch.LongTensor] = None,
+                 device: str = DEVICE,
+                 guide_w: float = 0.5,
+                 x_t_scale: float = 1.0,
+                 noise_scale: float = 1.0) -> torch.Tensor:
+        """
+        Genera `n_samples` condicionados a `labels` usando Classifier-Free Diffusion Guidance.
+        - Si `labels` es None, se muestrean aleatoriamente en [0, num_classes).
+        - `guide_w` controla la fuerza de la guía (w ≥ 0).
+        - `x_t_scale` escala el ruido inicial x_T.
+        - `noise_scale` escala el ruido añadido en cada paso (si t > 0).
+        Retorna: Tensor de forma (n_samples, 1, 28, 28) en [0,1].
+        """
+        self.nn_model.eval()
+        if labels is None:
+            labels = torch.randint(
+                0,
+                self.num_classes,
+                (n_samples,),
+                device=device,
+                dtype=torch.long
+            )
+        else:
+            labels = labels.to(device)
+        x_i = torch.randn(
+            n_samples,
+            *self.image_size,
+            device=device
+        ) * x_t_scale
+        t_steps = torch.arange(
+            self.n_T - 1,
+            -1,
+            -1,
+            device=device,
+            dtype=torch.long
+        )
+        alpha_sqrt = self.alphas.sqrt()                   
+        one_minus_alpha_cumprod_sqrt = self.sqrt_one_minus_alphas_cumprod
+        for t in t_steps:
+            mask_ctx = torch.zeros_like(labels, dtype=torch.float, device=device)
+            mask_noc = torch.ones_like(labels,  dtype=torch.float, device=device)
+
+            t_norm = (t / (self.n_T - 1)).view(1,1,1,1)
+            t_emb  = t_norm.repeat(n_samples, 1, 1, 1)
+
+            eps_ctx   = self.nn_model(x_i, labels, t_emb, mask_ctx)
+            eps_noctx = self.nn_model(x_i, labels, t_emb, mask_noc)
+
+            eps = (1 + guide_w) * eps_ctx - guide_w * eps_noctx
+
+            alpha_t = alpha_sqrt[t].view(-1,1,1,1)
+            sqrt_1m_alpha = one_minus_alpha_cumprod_sqrt[t].view(-1,1,1,1)
+            x_prev = (1.0 / alpha_t) * (
+                x_i
+                - ((1.0 - self.alphas[t]).view(-1,1,1,1) / sqrt_1m_alpha) * eps
+            )
+
+            if t > 0:
+                noise = torch.randn_like(x_i, device=device) * noise_scale
+                x_i = x_prev + noise
+            else:
+                x_i = x_prev
+        images = (x_i.clamp(-1,1) + 1) / 2.0
+        return images

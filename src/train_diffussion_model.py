@@ -128,8 +128,8 @@ class DiffussionTrainer:
                 if epoch % 10 == 0:
                     for cls in range(self.model.num_classes):
                         labels = torch.full((1,), cls, device=self.device, dtype=torch.long)
-                        sample = self.model.sample(1, labels)
-                        save_image(sample, os.path.join(self.image_path, f"epoch{epoch}_class{cls}.png"), normalize=True)
+                        sample_imgs, _ = self.model.sample(labels, n_sample=1, guide_w=2)
+                        save_image(sample_imgs, os.path.join(self.image_path, f"epoch{epoch}_class{cls}.png"), normalize=True)
                 else:
                     print(f"Skipping conditional sampling at epoch {epoch}")
             else:

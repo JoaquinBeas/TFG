@@ -1,120 +1,96 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import math
 from tqdm import tqdm
-from src.utils.config import DEVICE, TIMESTEPS, MODEL_IN_CHANNELS, IMAGE_SIZE, MNIST_N_CLASSES
-from src.utils.unet_conditional import ConditionalUnet
+from src.utils.config import DEVICE, IMAGE_SIZE, MNIST_N_CLASSES
+from src.utils.unet_conditional import ContextUnet, ddpm_schedules
 
 class ConditionalDiffusionModel(nn.Module):
     """
-    Modelo de difusión Gaussiana condicional por clase, con la misma configuración que el DiffusionUnet original.
-    Usa una U-Net condicional (embeddings de tiempo + clase).
+    Conditional DDPM with classifier-free guidance and final binarization
     """
-    def __init__(
-        self,
-        image_size: int = IMAGE_SIZE,
-        in_channels: int = MODEL_IN_CHANNELS,
-        
-        num_classes: int = MNIST_N_CLASSES,
-        timesteps: int = TIMESTEPS,
-        time_embedding_dim: int = 256,
-        base_dim: int = 32,
-        dim_mults: list = [1, 2, 4, 8],
-        device: str = DEVICE
-    ):
-        super().__init__()
+    def __init__(self, nn_model = ContextUnet(in_channels=1, n_feat=256, n_classes=MNIST_N_CLASSES), betas = (1e-4, 0.02), n_T= 400, device= DEVICE, drop_prob= 0.1, num_classes = MNIST_N_CLASSES):
+        super(ConditionalDiffusionModel, self).__init__()
+        self.nn_model = nn_model.to(device)
+
+        # register_buffer allows accessing dictionary produced by ddpm_schedules
+        # e.g. can access self.sqrtab later
+        for k, v in ddpm_schedules(betas[0], betas[1], n_T).items():
+            self.register_buffer(k, v)
+
+        self.n_T = n_T
         self.device = device
-        self.timesteps = timesteps
+        self.drop_prob = drop_prob
         self.num_classes = num_classes
+        self.loss_mse = nn.MSELoss()
 
-        # U-Net condicional
-        self.model = ConditionalUnet(
-            timesteps=timesteps,
-            time_embedding_dim=time_embedding_dim,
-            num_classes=num_classes,
-            in_channels=in_channels,
-            out_channels=in_channels,
-            base_dim=base_dim,
-            dim_mults=dim_mults
-        ).to(device)
+    def forward(self, x, c):
+        """
+        this method is used in training, so samples t and noise randomly
+        """
 
-        # Schedule de varianzas con coseno (match DiffusionUnet)
-        betas = self._cosine_variance_schedule(timesteps).to(device)
-        alphas = 1.0 - betas
-        alphas_cumprod = torch.cumprod(alphas, dim=0)
+        _ts = torch.randint(1, self.n_T+1, (x.shape[0],)).to(self.device)  # t ~ Uniform(0, n_T)
+        noise = torch.randn_like(x)  # eps ~ N(0, 1)
 
-        # Buffer para difusión
-        self.register_buffer('betas', betas)
-        self.register_buffer('alphas', alphas)
-        self.register_buffer('alphas_cumprod', alphas_cumprod)
-        self.register_buffer('sqrt_alphas_cumprod', torch.sqrt(alphas_cumprod))
-        self.register_buffer('sqrt_one_minus_alphas_cumprod', torch.sqrt(1.0 - alphas_cumprod))
+        x_t = (
+            self.sqrtab[_ts, None, None, None] * x
+            + self.sqrtmab[_ts, None, None, None] * noise
+        )  # This is the x_t, which is sqrt(alphabar) x_0 + sqrt(1-alphabar) * eps
+        # We should predict the "error term" from this x_t. Loss is what we return.
 
-    @staticmethod
-    def _cosine_variance_schedule(timesteps, epsilon=0.008):
-        steps = torch.linspace(0, timesteps, steps=timesteps + 1, dtype=torch.float32)
-        f_t = torch.cos(((steps / timesteps + epsilon) / (1.0 + epsilon)) * math.pi * 0.5) ** 2
-        betas = torch.clip(1.0 - f_t[1:] / f_t[:timesteps], 0.0, 0.999)
-        return betas
+        # dropout context with some probability
+        context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
+        
+        # return MSE between added noise, and our predicted noise
+        return self.loss_mse(noise, self.nn_model(x_t, c, _ts / self.n_T, context_mask))
+    
+    def p_losses(self, x, c):
+        return self.forward(x, c)
 
-    def q_sample(self, x_start: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
-        return (
-            self.sqrt_alphas_cumprod.gather(0, t).view(-1, 1, 1, 1) * x_start
-            + self.sqrt_one_minus_alphas_cumprod.gather(0, t).view(-1, 1, 1, 1) * noise
-        )
+    def sample(self, labels, n_sample, size=(1, 28, 28), device=DEVICE, guide_w = 0.0):
+        # we follow the guidance sampling scheme described in 'Classifier-Free Diffusion Guidance'
+        # to make the fwd passes efficient, we concat two versions of the dataset,
+        # one with context_mask=0 and the other context_mask=1
+        # we then mix the outputs with the guidance scale, w
+        # where w>0 means more guidance
+        with torch.no_grad():
+            x_i = torch.randn(n_sample, *size).to(device)  # x_T ~ N(0, 1), sample initial noise
+            c_i = labels.to(device)                          # shape: (n_sample,)
+            context_mask = torch.zeros_like(c_i, dtype=torch.float32, device=device)
 
-    def p_losses(self, x_start: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        # Seleccionar t uniformemente
-        t = torch.randint(0, self.timesteps, (x_start.size(0),), device=self.device).long()
-        noise = torch.randn_like(x_start)
-        x_t = self.q_sample(x_start, t, noise)
-        # Predecir ruido condicionando en la clase
-        pred_noise = self.model(x_t, t, labels)
-        return nn.functional.mse_loss(pred_noise, noise)
+            # double the batch
+            c_i = c_i.repeat(2)
+            context_mask = context_mask.repeat(2)
+            context_mask[n_sample:] = 1.0 # makes second half of batch context free
 
-    @torch.no_grad()
-    def sample(
-        self,
-        n_samples: int,
-        class_labels: torch.Tensor,
-        clipped: bool = True
-    ) -> torch.Tensor:
-        x_t = torch.randn(
-            (n_samples, MODEL_IN_CHANNELS, IMAGE_SIZE, IMAGE_SIZE),
-            device=self.device
-        )
-        for i in tqdm(range(self.timesteps - 1, -1, -1), desc="Sampling conditional"):
-            t = torch.full((n_samples,), i, device=self.device, dtype=torch.long)
-            noise = torch.randn_like(x_t)
-            # Predicción del ruido
-            pred = self.model(x_t, t, class_labels)
-            alpha_t = self.alphas.gather(0, t).view(-1, 1, 1, 1)
-            alpha_cumprod_t = self.alphas_cumprod.gather(0, t).view(-1, 1, 1, 1)
-            beta_t = self.betas.gather(0, t).view(-1, 1, 1, 1)
+            x_i_store = [] # keep track of generated steps in case want to plot something 
+            print()
+            for i in range(self.n_T, 0, -1):
+                print(f'sampling timestep {i}',end='\r')
+                t_is = torch.tensor([i / self.n_T]).to(device)
+                t_is = t_is.repeat(n_sample,1,1,1)
 
-            if clipped:
-                # Estimate x0 y clip
-                x0_pred = (x_t - (1 - alpha_cumprod_t).sqrt() * pred) / alpha_cumprod_t.sqrt()
-                x0_pred = x0_pred.clamp(-1.0, 1.0)
-                prev_cumprod = (
-                    self.alphas_cumprod.gather(0, t - 1)
-                    .view(-1, 1, 1, 1)
-                    if i > 0 else torch.ones_like(alpha_cumprod_t)
+                # double batch
+                x_i = x_i.repeat(2,1,1,1)
+                t_is = t_is.repeat(2,1,1,1)
+
+                z = torch.randn(n_sample, *size).to(device) if i > 1 else 0
+
+                # split predictions and compute weighting
+                eps = self.nn_model(x_i, c_i, t_is, context_mask)
+                eps1 = eps[:n_sample]
+                eps2 = eps[n_sample:]
+                eps = (1+guide_w)*eps1 - guide_w*eps2
+                x_i = x_i[:n_sample]
+                x_i = (
+                    self.oneover_sqrta[i] * (x_i - eps * self.mab_over_sqrtmab[i])
+                    + self.sqrt_beta_t[i] * z
                 )
-                mean = (
-                    beta_t * prev_cumprod.sqrt() / (1 - alpha_cumprod_t) * x0_pred
-                    + (1 - prev_cumprod) * alpha_t.sqrt() / (1 - alpha_cumprod_t) * x_t
-                )
-                var = beta_t * (1 - prev_cumprod) / (1 - alpha_cumprod_t)
-                x_t = mean + var.sqrt() * noise
-            else:
-                mean = (1.0 / alpha_t.sqrt()) * (
-                    x_t - (1 - alpha_t) / (1 - alpha_cumprod_t).sqrt() * pred
-                )
-                x_t = mean + beta_t.sqrt() * noise
-
-        # ——— BINARIZACIÓN ———
-        # todo pixel > 0 pasa a 1.0, el resto a 0.0
-        x_t = (x_t > 0).float()
-
-        return x_t
+                if i % 20 == 0 or i == self.n_T or i < 8:
+                    xi_cpu = x_i.detach().cpu().numpy()
+                    x_i_store.append(xi_cpu)
+                    del xi_cpu
+            torch.cuda.empty_cache()
+            x_i_store = np.array(x_i_store)
+            return x_i, x_i_store

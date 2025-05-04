@@ -7,6 +7,7 @@ from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARN
 # Importamos ambas funciones para cargar los datasets:
 from src.utils.data_loader import get_mnist_dataloaders, get_synthetic_mnist_dataloaders
 from src.utils.diffusion_models_enum import MNISTModelType
+from src.utils.config import MNIST_N_CLASSES
 
 class MnistTrainer:
     def __init__( self, model_type: MNISTModelType = MNISTModelType.SIMPLE_CNN, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE, early_stopping_patience=MNIST_PATIENCE, model_path=TRAIN_MNIST_MODEL_DIR, use_synthetic_dataset: bool = False):
@@ -55,14 +56,34 @@ class MnistTrainer:
         elif model_type == MNISTModelType.COMPLEX_CNN:
             from src.mnist_models.mnist_complex_cnn import MNISTNet1
             self.model = MNISTNet1().to(self.device)
+        elif model_type == MNISTModelType.RESNET_PREACT:
+            from src.mnist_models.resnet_preact import ResNetPreAct
+            # Config mínimo inline:
+            class Cfg: pass
+            cfg = Cfg(); cfg.model = Cfg()
+            cfg.model.in_channels    = 1
+            cfg.model.n_classes      = MNIST_N_CLASSES
+            cfg.model.base_channels  = 16
+            cfg.model.block_type     = 'basic'
+            cfg.model.depth          = 20
+            cfg.model.remove_first_relu = False
+            cfg.model.add_last_bn    = False
+            cfg.model.preact_stage   = [True, True, True]
+            self.model = ResNetPreAct(cfg).to(self.device)
+        elif model_type == MNISTModelType.DECISION_TREE:
+            from src.mnist_models.mnist_decision_tree import MNISTDecisionTree
+            self.model = MNISTDecisionTree(max_depth=40)  # o lo que quieras
         else:
             raise ValueError("Modelo MNIST desconocido.")
-        
-        self.num_epochs = num_epochs
+        if model_type == MNISTModelType.DECISION_TREE:
+            self.num_epochs = 1
+            self.early_stopping_patience = 0
+        else:
+            self.num_epochs = num_epochs
+            self.early_stopping_patience = early_stopping_patience
         self.learning_rate = learning_rate
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         self.criterion = nn.CrossEntropyLoss()
-        self.early_stopping_patience = early_stopping_patience
         
         # Crear el directorio para almacenar los checkpoints del modelo basado en el valor del enum
         self.checkpoint_dir = os.path.join(model_path, model_type.value)

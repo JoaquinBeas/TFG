@@ -18,7 +18,7 @@ def main():
     )
 
     # Se entrena el modelo y se evalúa sobre el conjunto de test internamente
-    avg_loss, accuracy = trainer.train_model()
+    avg_loss, accuracy = trainer.model()
 
     print("\n=== Resultados finales en el conjunto de test ===")
     print(f"Pérdida Promedio: {avg_loss:.4f}")

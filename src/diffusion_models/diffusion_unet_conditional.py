@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import math
 from tqdm import tqdm
+from src.utils.cosine_variance_schedule import _cosine_variance_schedule
 from src.utils.config import DEVICE, IMAGE_SIZE, MNIST_N_CLASSES
 from src.utils.unet_conditional import ContextUnet, ddpm_schedules
 
@@ -14,12 +15,16 @@ class ConditionalDiffusionModel(nn.Module):
     def __init__(self, nn_model = ContextUnet(in_channels=1, n_feat=256, n_classes=MNIST_N_CLASSES), betas = (1e-4, 0.02), n_T= 400, device= DEVICE, drop_prob= 0.1, num_classes = MNIST_N_CLASSES):
         super(ConditionalDiffusionModel, self).__init__()
         self.nn_model = nn_model.to(device)
-
-        # register_buffer allows accessing dictionary produced by ddpm_schedules
-        # e.g. can access self.sqrtab later
         for k, v in ddpm_schedules(betas[0], betas[1], n_T).items():
             self.register_buffer(k, v)
+        self.betas = _cosine_variance_schedule()  #  Definir las betas
 
+        # Asegúrate de registrar alphas_cumprod si no está
+        if not hasattr(self, 'alphas_cumprod'):
+            betas_tensor = self.betas  # este ya es un tensor, registrado como buffer
+            self.alphas = 1.0 - betas_tensor
+            alphas_cumprod = torch.cumprod(self.alphas, dim=0)
+            self.register_buffer('alphas_cumprod', alphas_cumprod)
         self.n_T = n_T
         self.device = device
         self.drop_prob = drop_prob
@@ -95,106 +100,88 @@ class ConditionalDiffusionModel(nn.Module):
             torch.cuda.empty_cache()
             x_i_store = np.array(x_i_store)
             return x_i, x_i_store
+
     @torch.no_grad()
     def sampling(self,
-             n_samples: int,
-             labels: Optional[torch.LongTensor] = None,
-             device: str = DEVICE,
-             guide_w: float = 0.5,
-             x_t_scale: float = 1.0,
-             noise_scale: float = 1.0,
-             clipped_reverse_diffusion: bool = True) -> torch.Tensor:
+                n_samples: int,
+                labels: Optional[torch.LongTensor] = None,
+                device: str = DEVICE,
+                guide_w: float = 1.0,
+                x_t_scale: float = 1.0,
+                noise_scale: float = 1.0,
+                clipped_reverse_diffusion: bool = True) -> torch.Tensor:
         """
-        Reverse‐diffusion sampler con Classifier‐Free Guidance con opción de clipped reverse diffusion.
-        - n_samples: número de imágenes a generar.
-        - labels: LongTensor (n_samples,) con valores [0, num_classes). Si es None, se generan aleatorias.
-        - guide_w: fuerza del guidance (w ≥ 0).
-        - x_t_scale: escala del ruido inicial x_T.
-        - noise_scale: escala del ruido añadido en cada paso (si t > 1).
-        - clipped_reverse_diffusion: si es True, usa el método de reverse diffusion con clipaje.
-        Retorna: Tensor (n_samples, 1, 28, 28) con valores en [0,1].
+        Generate n_samples images by reverse diffusion.
+        If clipped_reverse_diffusion is True, uses clipping of x0 and no noise injection,
+        and forces background to pure black.
+        Otherwise uses standard DDPM reverse diffusion with noise.
         """
-        self.nn_model.eval()
-
-        # — Labels: aleatorias si no se pasan —
+        # 1) Ensure labels tensor
         if labels is None:
-            labels = torch.randint(0,
-                                self.num_classes,
-                                (n_samples,),
-                                device=device,
-                                dtype=torch.long)
-        else:
-            labels = labels.to(device)
+            labels = torch.randint(
+                low=0,
+                high=self.num_classes,
+                size=(n_samples,),
+                device=device,
+                dtype=torch.long
+            )
 
-        # — Ruido inicial en x_T —
-        x = torch.randn(n_samples, *(1,28,28), device=device) * x_t_scale
+        # 2) Initialize x_T as normal noise
+        x = torch.randn(n_samples, 1, 28, 28, device=device) * x_t_scale
 
-        # — Reverse diffusion paso a paso —
+        # 3) Loop from T down to 1
         for t in range(self.n_T, 0, -1):
-            # embedding de timestep normalizado a [0,1]
+            # build index vector
+            t_vec = torch.full((n_samples,), t, dtype=torch.long, device=device)
+
+            # classifier-free guidance
             t_norm = torch.full((n_samples,1,1,1),
                                 float(t) / self.n_T,
                                 device=device)
-
-            # máscaras para guidance
             mask_ctx = torch.zeros(n_samples, device=device)
             mask_noc = torch.ones(n_samples,  device=device)
+            eps_ctx = self.nn_model(x, labels, t_norm, mask_ctx)
+            eps_noc = self.nn_model(x, labels, t_norm, mask_noc)
+            eps = (1.0 + guide_w) * eps_ctx - guide_w * eps_noc
 
-            # 1) predecir ruido con contexto y sin contexto
-            eps_ctx   = self.nn_model(x, labels, t_norm, mask_ctx)
-            eps_noctx = self.nn_model(x, labels, t_norm, mask_noc)
-
-            # 2) mezclar según guide_w
-            eps = (1 + guide_w) * eps_ctx - guide_w * eps_noctx
-            
+            # choose noise: zero for clipped, random for unclipped
             if clipped_reverse_diffusion:
-                # --- Clipped Reverse Diffusion approach ---
-                # Primero predecir x_0 a partir de x_t y el ruido predicho
-                alpha_cumprod = self.alphas_cumprod[t].view(1,1,1,1)
-                sqrt_alpha_cumprod = torch.sqrt(alpha_cumprod)
-                
-                # Predice x_0 usando la fórmula: x_0 = (x_t - sqrt(1-ᾱ_t) * eps) / sqrt(ᾱ_t)
-                x_0_pred = (x - torch.sqrt(1 - alpha_cumprod) * eps) / sqrt_alpha_cumprod
-                
-                # Aplicar clipaje a la predicción de x_0
-                x_0_pred = x_0_pred.clamp(-1.0, 1.0)
-                
-                if t > 1:
-                    # Calcular x_{t-1} usando x_0 clipado
-                    alpha_cumprod_prev = self.alphas_cumprod[t-1].view(1,1,1,1)
-                    alpha = self.alphas[t].view(1,1,1,1)
-                    beta = self.betas[t].view(1,1,1,1)
-                    
-                    # Calcular la media según la fórmula del clipped reverse diffusion
-                    mean = (beta * torch.sqrt(alpha_cumprod_prev) / (1.0 - alpha_cumprod)) * x_0_pred + \
-                        ((1.0 - alpha_cumprod_prev) * torch.sqrt(alpha) / (1.0 - alpha_cumprod)) * x
-                    
-                    # Calcular la desviación estándar
-                    std = torch.sqrt(beta * (1.0 - alpha_cumprod_prev) / (1.0 - alpha_cumprod))
-                    
-                    # Actualizar x con la media y añadir ruido
-                    x = mean
-                    if t > 1:
-                        x = x + std * torch.randn_like(x, device=device) * noise_scale
-                else:
-                    # Para el último paso (t=1 -> t=0)
-                    beta = self.betas[t].view(1,1,1,1)
-                    alpha_cumprod = self.alphas_cumprod[t].view(1,1,1,1)
-                    
-                    # Fórmula simplificada para t=1
-                    x = (beta / (1.0 - alpha_cumprod)) * x_0_pred
+                noise = torch.zeros_like(x)
             else:
-                # --- Standard Reverse Diffusion (original) ---
-                # 3) actualizar x_{t-1} según DDPM:
-                #    x_{t-1} = 1/√α_t ( x_t – (1–α_t)/√(1–ᾱ_t) · ε ) + √β_t · z
-                inv_sqrt_alpha   = self.oneover_sqrta[t].view(1,1,1,1)
-                coef             = self.mab_over_sqrtmab[t].view(1,1,1,1)
-                beta_sqrt        = self.sqrt_beta_t[t].view(1,1,1,1)
-                x = inv_sqrt_alpha * (x - coef * eps)
-                # añadir ruido extra si no es el último paso
+                noise = torch.randn_like(x) * noise_scale if t > 1 else torch.zeros_like(x)
+
+            if clipped_reverse_diffusion:
+                # gather buffers
+                sqrt_ab   = self.sqrtab.gather(0, t_vec).view(n_samples,1,1,1)
+                sqrt_mab  = self.sqrtmab.gather(0, t_vec).view(n_samples,1,1,1)
+                inv_sqrt_a= self.oneover_sqrta.gather(0, t_vec).view(n_samples,1,1,1)
+                coef_mab  = self.mab_over_sqrtmab.gather(0, t_vec).view(n_samples,1,1,1)
+
+                # predict x0 and clamp
+                x0_pred = (x - sqrt_mab * eps) / sqrt_ab
+                x0_pred = x0_pred.clamp(-1.0, 1.0)
+
+                # recompute eps_prime
+                eps_prime = (x - sqrt_ab * x0_pred) / sqrt_mab
+
+                # posterior mean (no noise)
+                x = inv_sqrt_a * (x - coef_mab * eps_prime)
+
+            else:
+                # standard reverse diffusion
+                inv_sqrt_a = self.oneover_sqrta.gather(0, t_vec).view(n_samples,1,1,1)
+                coef_mab   = self.mab_over_sqrtmab.gather(0, t_vec).view(n_samples,1,1,1)
+                sqrt_bt    = self.sqrt_beta_t.gather(0, t_vec).view(n_samples,1,1,1)
+
+                x = inv_sqrt_a * (x - coef_mab * eps)
                 if t > 1:
-                    x = x + beta_sqrt * torch.randn_like(x, device=device) * noise_scale
-        
-        # Mapear de [–1,1] a [0,1]
-        images = (x.clamp(-1,1) + 1) * 0.5
-        return images
+                    x = x + sqrt_bt * noise
+
+        # 4) Force pure black background for clipped
+        if clipped_reverse_diffusion:
+            x = torch.where(x < 0.0,
+                            torch.full_like(x, -1.0),
+                            x)
+
+        # 5) Map values from [-1,1] to [0,1]
+        return (x.clamp(-1,1) + 1.0) * 0.5

@@ -21,7 +21,7 @@ from src.utils.config import (
     MNIST_N_CLASSES
 )
 from src.utils.data_loader import get_mnist_dataloaders
-from src.utils.mnist_models_enum import DiffusionModelType
+from src.utils.diffusion_models_enum import DiffusionModelType
 
 class DiffussionTrainer:
     def __init__(
@@ -30,7 +30,7 @@ class DiffussionTrainer:
         num_epochs=MNIST_EPOCHS,
         learning_rate=MNIST_LEARNING_RATE,
         batch_size=MNIST_BATCH_SIZE,
-        early_stopping_patience=3,
+        early_stopping_patience=4,
         model_path=TRAIN_DIFFUSION_MODEL_DIR,
         image_path=TRAIN_DIFFUSION_SAMPLES_DIR
     ):
@@ -46,8 +46,8 @@ class DiffussionTrainer:
         # Instanciar modelo según enum
         if model_type == DiffusionModelType.GUIDED_UNET:
             self.model = DiffusionGuidedUnet().to(self.device)
-        elif model_type == DiffusionModelType.RESNET:
-            self.model = DiffusionResnet().to(self.device)
+        # elif model_type == DiffusionModelType.RESNET:
+        #     self.model = DiffusionResnet().to(self.device)
         elif model_type == DiffusionModelType.UNET:
             self.model = DiffusionUnet(
                 image_size=MODEL_IMAGE_SIZE,
@@ -133,7 +133,7 @@ class DiffussionTrainer:
                 else:
                     print(f"Skipping conditional sampling at epoch {epoch}")
             else:
-                sample = self.model.sample(9)
+                sample = self.model.sampling(9)
                 save_image(sample, os.path.join(self.image_path, f"epoch{epoch}.png"), nrow=3, normalize=True)
                 print(f"Saved sample at epoch {epoch}")
 

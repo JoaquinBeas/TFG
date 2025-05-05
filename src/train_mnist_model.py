@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, random_split
 from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, MNIST_PATIENCE, TRAIN_MNIST_MODEL_DIR
 # Importamos ambas funciones para cargar los datasets:
 from src.utils.data_loader import get_mnist_dataloaders, get_synthetic_mnist_dataloaders
-from src.utils.diffusion_models_enum import MNISTModelType
+from src.utils.mnist_models_enum import MNISTModelType
 from src.utils.config import MNIST_N_CLASSES
 
 class MnistTrainer:

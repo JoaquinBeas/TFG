@@ -31,7 +31,7 @@ MNIST_MAP = {
 
 DIFF_MAP = {
     "diffusion_guided_unet": DiffusionModelType.GUIDED_UNET,
-    "diffusion_resnet": DiffusionModelType.RESNET,
+    # "diffusion_resnet": DiffusionModelType.RESNET,
     "diffusion_unet": DiffusionModelType.UNET,
     "unet": DiffusionModelType.UNET,
     "conditional_unet": DiffusionModelType.CONDITIONAL_UNET,
@@ -104,9 +104,9 @@ def load_diffusion_model(model_type: DiffusionModelType) -> torch.nn.Module:
     if model_type == DiffusionModelType.GUIDED_UNET:
         from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet as D
         model = D()
-    elif model_type == DiffusionModelType.RESNET:
-        from src.diffusion_models.diffusion_resnet import DiffusionResnet as R
-        model = R()
+    # elif model_type == DiffusionModelType.RESNET:
+    #     from src.diffusion_models.diffusion_resnet import DiffusionResnet as R
+    #     model = R()
     elif model_type == DiffusionModelType.UNET:
         from src.diffusion_models.diffusion_unet import DiffusionUnet as U
         model = U(MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS)

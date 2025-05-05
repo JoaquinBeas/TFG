@@ -35,7 +35,9 @@ def prepare_dirs():
             shutil.rmtree(d)
         os.makedirs(d)
 
-def generate_samples_for_diffusion(diff_type: DiffusionModelType):
+def generate_samples_for_diffusion(diff_type: DiffusionModelType,
+                                   clipped_dest: str,
+                                   unclipped_dest: str):
     """
     Carga o entrena el modelo de difusión y genera N_IMAGES muestras
     clipped y unclipped en las carpetas correspondientes.
@@ -53,14 +55,16 @@ def generate_samples_for_diffusion(diff_type: DiffusionModelType):
     trainer.model.to(DEVICE).eval()
 
     # Muestreo
-    clipped = trainer.model.sampling(N_IMAGES, clipped_reverse_diffusion=True, device=DEVICE)
+    clipped = trainer.model.sampling(N_IMAGES, pped_reverse_diffusion=True, device=DEVICE)
     unclipped = trainer.model.sampling(N_IMAGES, clipped_reverse_diffusion=False, device=DEVICE)
 
     # Guarda PNGs
     for i, img in enumerate(clipped):
-        transforms.ToPILImage()(img.cpu()).save(os.path.join(CLIPPED_DIR, f"{diff_type.value}_{i}.png"))
+        transforms.ToPILImage()(img.cpu()).save(
+            os.path.join(clipped_dest, f"{diff_type.value}_{i}.png"))
     for i, img in enumerate(unclipped):
-        transforms.ToPILImage()(img.cpu()).save(os.path.join(UNCLIPPED_DIR, f"{diff_type.value}_{i}.png"))
+        transforms.ToPILImage()(img.cpu()).save(
+            os.path.join(unclipped_dest, f"{diff_type.value}_{i}.png"))
 
 def load_or_train_mnist(model_type: MNISTModelType):
     """
@@ -95,13 +99,31 @@ def eval_confidence(loader, mnist_model):
     return sum(all_confs)/len(all_confs), Counter(all_preds)
 
 def run():
-    prepare_dirs()
+    # Base general
+    base = os.path.join(DATA_DIR, "tests", "evaluate_sampling")
 
     for diff_type in DiffusionModelType:
         print(f"\n=== Sampling con diffusion model {diff_type.value} ===")
-        generate_samples_for_diffusion(diff_type)
 
-        # --- CORRECCIÓN: Clase ImgFolder usa self.folder ---
+        # Directorio concreto para este modelo
+        model_base = os.path.join(base, diff_type.value)
+        clipped_dir = os.path.join(model_base, "clipped")
+        unclipped_dir = os.path.join(model_base, "unclipped")
+
+        # Limpiar y (re)crear sólo estas dos carpetas
+        for d in (clipped_dir, unclipped_dir):
+            if os.path.exists(d):
+                shutil.rmtree(d)
+            os.makedirs(d, exist_ok=True)
+
+        # 1) Generar muestras
+        generate_samples_for_diffusion(
+            diff_type,
+            clipped_dest=clipped_dir,
+            unclipped_dest=unclipped_dir
+        )
+
+        # 2) Montar DataLoaders sobre las carpetas limpias de este diff_type
         class ImgFolder(Dataset):
             def __init__(self, folder):
                 self.folder = folder
@@ -113,13 +135,14 @@ def run():
                 img = Image.open(path).convert("L")
                 return transform(img), self.files[i]
 
-        # Ahora sí podemos construir los loaders
-        clipped_loader = DataLoader(ImgFolder(CLIPPED_DIR), batch_size=BATCH_SIZE)
-        unclipped_loader = DataLoader(ImgFolder(UNCLIPPED_DIR), batch_size=BATCH_SIZE)
+        clipped_loader = DataLoader(ImgFolder(clipped_dir), batch_size=BATCH_SIZE)
+        unclipped_loader = DataLoader(ImgFolder(unclipped_dir), batch_size=BATCH_SIZE)
 
+        # 3) Evaluar sólo con resnet_preact
         mn_type = MNISTModelType.RESNET_PREACT
         print(f"\n--> Evaluando con MNIST model {mn_type.value}")
         mn_model = load_or_train_mnist(mn_type)
+
         avg_c, dist_c = eval_confidence(clipped_loader, mn_model)
         avg_u, dist_u = eval_confidence(unclipped_loader, mn_model)
 

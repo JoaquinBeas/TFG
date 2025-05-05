@@ -102,14 +102,16 @@ class ConditionalDiffusionModel(nn.Module):
              device: str = DEVICE,
              guide_w: float = 0.5,
              x_t_scale: float = 1.0,
-             noise_scale: float = 1.0) -> torch.Tensor:
+             noise_scale: float = 1.0,
+             clipped_reverse_diffusion: bool = True) -> torch.Tensor:
         """
-        Reverse‐diffusion sampler con Classifier‐Free Guidance.
+        Reverse‐diffusion sampler con Classifier‐Free Guidance con opción de clipped reverse diffusion.
         - n_samples: número de imágenes a generar.
         - labels: LongTensor (n_samples,) con valores [0, num_classes). Si es None, se generan aleatorias.
         - guide_w: fuerza del guidance (w ≥ 0).
         - x_t_scale: escala del ruido inicial x_T.
         - noise_scale: escala del ruido añadido en cada paso (si t > 1).
+        - clipped_reverse_diffusion: si es True, usa el método de reverse diffusion con clipaje.
         Retorna: Tensor (n_samples, 1, 28, 28) con valores en [0,1].
         """
         self.nn_model.eval()
@@ -144,19 +146,55 @@ class ConditionalDiffusionModel(nn.Module):
 
             # 2) mezclar según guide_w
             eps = (1 + guide_w) * eps_ctx - guide_w * eps_noctx
-
-            # 3) actualizar x_{t-1} según DDPM:
-            #    x_{t-1} = 1/√α_t ( x_t – (1–α_t)/√(1–ᾱ_t) · ε ) + √β_t · z
-            inv_sqrt_alpha   = self.oneover_sqrta[t].view(1,1,1,1)
-            coef             = self.mab_over_sqrtmab[t].view(1,1,1,1)
-            beta_sqrt        = self.sqrt_beta_t[t].view(1,1,1,1)
-
-            x = inv_sqrt_alpha * (x - coef * eps)
-
-            # añadir ruido extra si no es el último paso
-            if t > 1:
-                x = x + beta_sqrt * torch.randn_like(x, device=device) * noise_scale
-
+            
+            if clipped_reverse_diffusion:
+                # --- Clipped Reverse Diffusion approach ---
+                # Primero predecir x_0 a partir de x_t y el ruido predicho
+                alpha_cumprod = self.alphas_cumprod[t].view(1,1,1,1)
+                sqrt_alpha_cumprod = torch.sqrt(alpha_cumprod)
+                
+                # Predice x_0 usando la fórmula: x_0 = (x_t - sqrt(1-ᾱ_t) * eps) / sqrt(ᾱ_t)
+                x_0_pred = (x - torch.sqrt(1 - alpha_cumprod) * eps) / sqrt_alpha_cumprod
+                
+                # Aplicar clipaje a la predicción de x_0
+                x_0_pred = x_0_pred.clamp(-1.0, 1.0)
+                
+                if t > 1:
+                    # Calcular x_{t-1} usando x_0 clipado
+                    alpha_cumprod_prev = self.alphas_cumprod[t-1].view(1,1,1,1)
+                    alpha = self.alphas[t].view(1,1,1,1)
+                    beta = self.betas[t].view(1,1,1,1)
+                    
+                    # Calcular la media según la fórmula del clipped reverse diffusion
+                    mean = (beta * torch.sqrt(alpha_cumprod_prev) / (1.0 - alpha_cumprod)) * x_0_pred + \
+                        ((1.0 - alpha_cumprod_prev) * torch.sqrt(alpha) / (1.0 - alpha_cumprod)) * x
+                    
+                    # Calcular la desviación estándar
+                    std = torch.sqrt(beta * (1.0 - alpha_cumprod_prev) / (1.0 - alpha_cumprod))
+                    
+                    # Actualizar x con la media y añadir ruido
+                    x = mean
+                    if t > 1:
+                        x = x + std * torch.randn_like(x, device=device) * noise_scale
+                else:
+                    # Para el último paso (t=1 -> t=0)
+                    beta = self.betas[t].view(1,1,1,1)
+                    alpha_cumprod = self.alphas_cumprod[t].view(1,1,1,1)
+                    
+                    # Fórmula simplificada para t=1
+                    x = (beta / (1.0 - alpha_cumprod)) * x_0_pred
+            else:
+                # --- Standard Reverse Diffusion (original) ---
+                # 3) actualizar x_{t-1} según DDPM:
+                #    x_{t-1} = 1/√α_t ( x_t – (1–α_t)/√(1–ᾱ_t) · ε ) + √β_t · z
+                inv_sqrt_alpha   = self.oneover_sqrta[t].view(1,1,1,1)
+                coef             = self.mab_over_sqrtmab[t].view(1,1,1,1)
+                beta_sqrt        = self.sqrt_beta_t[t].view(1,1,1,1)
+                x = inv_sqrt_alpha * (x - coef * eps)
+                # añadir ruido extra si no es el último paso
+                if t > 1:
+                    x = x + beta_sqrt * torch.randn_like(x, device=device) * noise_scale
+        
         # Mapear de [–1,1] a [0,1]
         images = (x.clamp(-1,1) + 1) * 0.5
         return images

@@ -1,7 +1,6 @@
 from enum import Enum
 
-class MNISTModelType(Enum):
-    SIMPLE_CNN     = "simple_cnn"
-    COMPLEX_CNN    = "complex_cnn"
-    DECISION_TREE  = "decision_tree"
-    RESNET_PREACT  = "resnet_preact"
+class DiffusionModelType(Enum):
+    GUIDED_UNET = "diffusion_guided_unet"
+    UNET = "diffusion_unet"
+    CONDITIONAL_UNET = "conditional_unet"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import torch
 from src.train_mnist_model import MnistTrainer
-from src.utils.diffusion_models_enum import MNISTModelType
+from src.utils.mnist_models_enum import MNISTModelType
 
 def main():
     # Indicamos que se utilizará el dataset MNIST original
@@ -9,7 +9,7 @@ def main():
 
     # Instanciamos el entrenador para el modelo MNIST complejo (MNISTNet1)
     trainer = MnistTrainer(
-        model_type=MNISTModelType.COMPLEX_CNN,  # Selecciona el modelo complejo
+        model_type=MNISTModelType.RESNET_PREACT,  # Selecciona el modelo complejo
         num_epochs=20,                          # Número de épocas (ajusta según convenga)
         learning_rate=0.002,                    # Tasa de aprendizaje
         batch_size=64,                          # Tamaño de lote

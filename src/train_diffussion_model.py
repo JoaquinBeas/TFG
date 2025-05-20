@@ -6,6 +6,7 @@ from torchvision.utils import save_image
 from torch.utils.data import DataLoader, random_split
 from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet
 from src.diffusion_models.diffusion_resnet import DiffusionResnet
+import matplotlib.pyplot as plt
 from src.diffusion_models.diffusion_unet import DiffusionUnet
 from src.diffusion_models.diffusion_unet_conditional import ConditionalDiffusionModel
 from src.utils.config import (
@@ -70,6 +71,7 @@ class DiffussionTrainer:
         os.makedirs(self.image_path, exist_ok=True)
         print(f"Image dir: {self.image_path}")
         self.early_stopping_patience = early_stopping_patience
+        self.loss_history = []
 
     def train_epoch(self, epoch):
         self.model.train()
@@ -117,7 +119,7 @@ class DiffussionTrainer:
             self.train_epoch(epoch)
             val_loss = self.evaluate_on_loader(self.val_loader, loader_name="Validation")
 
-            # Save checkpoint
+            self.loss_history.append(val_loss)
             checkpoint_path = os.path.join(self.checkpoint_dir, f"{epoch}.pt")
             torch.save(self.model.state_dict(), checkpoint_path)
             print(f"Saved checkpoint: {checkpoint_path}")
@@ -126,10 +128,32 @@ class DiffussionTrainer:
             if isinstance(self.model, ConditionalDiffusionModel):
                 # Sample every 10 epochs
                 if epoch % 10 == 0:
+                    n = 10
                     for cls in range(self.model.num_classes):
-                        labels = torch.full((1,), cls, device=self.device, dtype=torch.long)
-                        sample_imgs, _ = self.model.sample(labels, n_sample=1, guide_w=2)
-                        save_image(sample_imgs, os.path.join(self.image_path, f"epoch{epoch}_class{cls}.png"), normalize=True)
+                        # 1) Creamos un tensor de etiquetas de tamaño n
+                        labels = torch.full(
+                            (n,), cls,
+                            device=self.device,
+                            dtype=torch.long
+                        )
+                        # 2) Muestreamos n imágenes de esa clase
+                        sample_imgs, _ = self.model.sample(
+                            labels,
+                            n_sample=n,
+                            guide_w=2
+                        )
+                        # 3) Guardamos con nrow=n para que queden todas en una fila
+                        out_path = os.path.join(
+                            self.image_path,
+                            f"epoch{epoch}_class{cls}_row.png"
+                        )
+                        save_image(
+                            sample_imgs,
+                            out_path,
+                            nrow=n,
+                            normalize=True
+                        )
+                        print(f"Guardado: {out_path}")
                 else:
                     print(f"Skipping conditional sampling at epoch {epoch}")
             else:
@@ -145,6 +169,21 @@ class DiffussionTrainer:
                 if patience >= self.early_stopping_patience:
                     print("Early stopping.")
                     break
+
+        # ------------------- dibujar y guardar la curva ------------------
+        plot_dir = os.path.join("src", "data", "plots")
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.figure(figsize=(6,4))
+        plt.plot(range(1, len(self.loss_history)+1), self.loss_history, marker="o")
+        plt.title("Diffusion training curve (Validation loss)")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.grid(True)
+        plt.tight_layout()
+        plot_path = os.path.join(plot_dir, "diffusion_learning_curve.png")
+        plt.savefig(plot_path, dpi=120)
+        plt.close()
+        print(f"Curva guardada en {plot_path}")
 
         test_loss = self.evaluate_on_loader(self.test_loader, loader_name="Test")
         final_ckpt = os.path.join(self.checkpoint_dir, "last_model.pt")

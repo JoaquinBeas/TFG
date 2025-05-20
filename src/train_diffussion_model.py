@@ -26,11 +26,11 @@ from src.utils.diffusion_models_enum import DiffusionModelType
 class DiffussionTrainer:
     def __init__(
         self,
-        model_type: DiffusionModelType = DiffusionModelType.GUIDED_UNET,
-        num_epochs=MNIST_EPOCHS,
+        model_type: DiffusionModelType = DiffusionModelType.CONDITIONAL_UNET,
+        num_epochs=100,
         learning_rate=MNIST_LEARNING_RATE,
         batch_size=MNIST_BATCH_SIZE,
-        early_stopping_patience=4,
+        early_stopping_patience=100,
         model_path=TRAIN_DIFFUSION_MODEL_DIR,
         image_path=TRAIN_DIFFUSION_SAMPLES_DIR
     ):
@@ -44,11 +44,11 @@ class DiffussionTrainer:
         self.val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
 
         # Instanciar modelo según enum
-        if model_type == DiffusionModelType.GUIDED_UNET:
-            self.model = DiffusionGuidedUnet().to(self.device)
+        # if model_type == DiffusionModelType.GUIDED_UNET:
+        #     self.model = DiffusionGuidedUnet().to(self.device)
         # elif model_type == DiffusionModelType.RESNET:
         #     self.model = DiffusionResnet().to(self.device)
-        elif model_type == DiffusionModelType.UNET:
+        if model_type == DiffusionModelType.UNET:
             self.model = DiffusionUnet(
                 image_size=MODEL_IMAGE_SIZE,
                 in_channels=MODEL_IN_CHANNELS,

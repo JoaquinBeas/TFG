@@ -19,7 +19,7 @@ def get_diffusion_model(model_type: DiffusionModelType):
     os.makedirs(checkpoint_dir, exist_ok=True)
     ckpt_path = os.path.join(checkpoint_dir, "last_model.pt")
 
-    trainer = DiffussionTrainer(model_type=model_type, num_epochs=50)
+    trainer = DiffussionTrainer(model_type=model_type, num_epochs=100)
     if os.path.exists(ckpt_path):
         trainer.model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
         print(f"Cargado diffusion {model_type.value} de {ckpt_path}")

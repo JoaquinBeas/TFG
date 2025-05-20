@@ -30,7 +30,7 @@ MNIST_MAP = {
 }
 
 DIFF_MAP = {
-    "diffusion_guided_unet": DiffusionModelType.GUIDED_UNET,
+    # "diffusion_guided_unet": DiffusionModelType.GUIDED_UNET,
     # "diffusion_resnet": DiffusionModelType.RESNET,
     "diffusion_unet": DiffusionModelType.UNET,
     "unet": DiffusionModelType.UNET,
@@ -101,13 +101,13 @@ def load_mnist_model(model_type: MNISTModelType) -> torch.nn.Module:
 
 def load_diffusion_model(model_type: DiffusionModelType) -> torch.nn.Module:
     # Instantiate architecture
-    if model_type == DiffusionModelType.GUIDED_UNET:
-        from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet as D
-        model = D()
+    # if model_type == DiffusionModelType.GUIDED_UNET:
+    #     from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet as D
+    #     model = D()
     # elif model_type == DiffusionModelType.RESNET:
     #     from src.diffusion_models.diffusion_resnet import DiffusionResnet as R
     #     model = R()
-    elif model_type == DiffusionModelType.UNET:
+    if model_type == DiffusionModelType.UNET:
         from src.diffusion_models.diffusion_unet import DiffusionUnet as U
         model = U(MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS)
     else:
@@ -131,7 +131,12 @@ def main():
     # MNIST teacher
     if args.train_mnist:
         logger.info("Training MNIST teacher...")
-        trainer = MnistTrainer(model_type=mnist_type, num_epochs=20, learning_rate=0.002, batch_size=64)
+        trainer = MnistTrainer(
+            model_type=mnist_type,  # Por defecto: ResNetPreAct
+            num_epochs=30, 
+            learning_rate=0.002, 
+            batch_size=64
+        )
         loss, acc = trainer.train_model()
         logger.info(f"Teacher loss={loss:.4f}, acc={acc:.2f}%")
         mnist_model = trainer.get_model()

@@ -3,14 +3,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
-from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, MNIST_PATIENCE, TRAIN_MNIST_MODEL_DIR
+from src.utils.config import DEVICE, MNIST_BATCH_SIZE, MNIST_EPOCHS, MNIST_LEARNING_RATE, MNIST_PATIENCE, SAVE_SYNTHETIC_DATASET_DIR, TRAIN_MNIST_MODEL_DIR
 # Importamos ambas funciones para cargar los datasets:
 from src.utils.data_loader import get_mnist_dataloaders, get_synthetic_mnist_dataloaders
 from src.utils.mnist_models_enum import MNISTModelType
 from src.utils.config import MNIST_N_CLASSES
 
 class MnistTrainer:
-    def __init__( self, model_type: MNISTModelType = MNISTModelType.SIMPLE_CNN, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE, early_stopping_patience=MNIST_PATIENCE, model_path=TRAIN_MNIST_MODEL_DIR, use_synthetic_dataset: bool = False):
+    def __init__( self, model_type: MNISTModelType = MNISTModelType.SIMPLE_CNN, num_epochs=MNIST_EPOCHS, learning_rate=MNIST_LEARNING_RATE, batch_size=MNIST_BATCH_SIZE, early_stopping_patience=MNIST_PATIENCE, model_path=TRAIN_MNIST_MODEL_DIR, use_synthetic_dataset: bool = False, synthetic_data_dir: str | None = None):
         """
         Inicializa el entrenador configurando el dispositivo, los dataloaders,
         el modelo, el optimizador y la función de pérdida.
@@ -30,8 +30,8 @@ class MnistTrainer:
         
         # Cargar el dataset utilizando el método correspondiente
         if use_synthetic_dataset:
-            print("Cargando dataset sintético...")
-            full_train_loader, test_loader = get_synthetic_mnist_dataloaders(batch_size=batch_size)
+            print(f"Cargando dataset sintético desde {synthetic_data_dir or SAVE_SYNTHETIC_DATASET_DIR} …")
+            full_train_loader, test_loader = get_synthetic_mnist_dataloaders(batch_size=batch_size,synthetic_data_dir=synthetic_data_dir)
             # full_train_loader.dataset es el dataset completo obtenido por la función get_synthetic_mnist_dataloaders
             full_train_dataset = full_train_loader.dataset
         else:

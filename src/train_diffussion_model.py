@@ -127,38 +127,34 @@ class DiffussionTrainer:
             # Generate samples
             if isinstance(self.model, ConditionalDiffusionModel):
                 # Sample every 10 epochs
-                if epoch % 10 == 0:
-                    n = 10
-                    for cls in range(self.model.num_classes):
-                        # 1) Creamos un tensor de etiquetas de tamaño n
-                        labels = torch.full(
-                            (n,), cls,
-                            device=self.device,
-                            dtype=torch.long
-                        )
-                        # 2) Muestreamos n imágenes de esa clase
-                        sample_imgs, _ = self.model.sample(
-                            labels,
-                            n_sample=n,
-                            guide_w=2
-                        )
-                        # 3) Guardamos con nrow=n para que queden todas en una fila
-                        out_path = os.path.join(
-                            self.image_path,
-                            f"epoch{epoch}_class{cls}_row.png"
-                        )
-                        save_image(
-                            sample_imgs,
+                if epoch % 1 == 0:
+                    labels = torch.arange(self.model.num_classes,   # → [0,1,…,9]
+                                        device=self.device,
+                                        dtype=torch.long)
+
+                    sample_imgs, _ = self.model.sample(
+                        labels=labels,
+                        n_sample=len(labels),        # <- 10, no 1
+                        guide_w=2,
+                        # clipped_reverse_diffusion=True   # opcional: imágenes más limpias
+                    )
+
+                    out_path = os.path.join(self.image_path,
+                                            f"epoch{epoch}.png")
+                    save_image(sample_imgs,
                             out_path,
-                            nrow=n,
-                            normalize=True
-                        )
-                        print(f"Guardado: {out_path}")
+                            nrow=self.model.num_classes,  # 10 por fila
+                            normalize=True)               # sample() ya devuelve [0,1]
+                    print(f"Guardado: {out_path}")
                 else:
                     print(f"Skipping conditional sampling at epoch {epoch}")
             else:
                 sample = self.model.sampling(9)
-                save_image(sample, os.path.join(self.image_path, f"epoch{epoch}.png"), nrow=3, normalize=True)
+                save_image(sample,
+                        os.path.join(self.image_path, f"epoch{epoch}.png"),
+                        nrow=3,
+                        normalize=True)
+
                 print(f"Saved sample at epoch {epoch}")
 
             # Early stopping

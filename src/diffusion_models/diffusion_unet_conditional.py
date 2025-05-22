@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 import math
 from tqdm import tqdm
-from utils.unet_conditional import ContextUnet, ddpm_schedules
-from utils.cosine_variance_schedule import _cosine_variance_schedule
+from src.utils.unet_conditional import ContextUnet, ddpm_schedules
+from src.utils.cosine_variance_schedule import _cosine_variance_schedule
 
 MNIST_N_CLASSES = 10
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

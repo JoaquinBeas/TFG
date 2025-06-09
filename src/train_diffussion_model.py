@@ -4,22 +4,18 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision.utils import save_image
 from torch.utils.data import DataLoader, random_split
-from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet
-from src.diffusion_models.diffusion_resnet import DiffusionResnet
 import matplotlib.pyplot as plt
 from src.diffusion_models.diffusion_unet import DiffusionUnet
 from src.diffusion_models.diffusion_unet_conditional import ConditionalDiffusionModel
 from src.utils.config import (
     DEVICE,
     MNIST_BATCH_SIZE,
-    MNIST_EPOCHS,
     MNIST_LEARNING_RATE,
     TRAIN_DIFFUSION_MODEL_DIR,
     TRAIN_DIFFUSION_SAMPLES_DIR,
     MODEL_IMAGE_SIZE,
     MODEL_IN_CHANNELS,
     TIMESTEPS,
-    MNIST_N_CLASSES
 )
 from src.utils.data_loader import get_mnist_dataloaders
 from src.utils.diffusion_models_enum import DiffusionModelType
@@ -43,7 +39,6 @@ class DiffussionTrainer:
         train_subset, val_subset = random_split(train_dataset, [train_size, val_size])
         self.train_loader = DataLoader(train_subset, batch_size=batch_size, shuffle=True)
         self.val_loader = DataLoader(val_subset, batch_size=batch_size, shuffle=False)
-
         # Instanciar modelo según enum
         # if model_type == DiffusionModelType.GUIDED_UNET:
         #     self.model = DiffusionGuidedUnet().to(self.device)

@@ -53,8 +53,8 @@ class MnistTrainer:
         if model_type == MNISTModelType.SIMPLE_CNN:
             from src.mnist_models.mnist_simple_cnn import MNISTCNN
             self.model = MNISTCNN().to(self.device)
-        elif model_type == MNISTModelType.COMPLEX_CNN:
-            from src.mnist_models.mnist_complex_cnn import MNISTNet1
+        elif model_type == MNISTModelType.COMPRESSED_CNN:
+            from src.mnist_models.mnist_compressed_cnn import MNISTNet1
             self.model = MNISTNet1().to(self.device)
         elif model_type == MNISTModelType.RESNET_PREACT:
             from src.mnist_models.resnet_preact import ResNetPreAct

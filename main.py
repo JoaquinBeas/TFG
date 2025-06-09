@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Mapping strings to enum types
 MNIST_MAP = {
     "mnist_cnn": MNISTModelType.SIMPLE_CNN,
-    "mnist_complex_cnn": MNISTModelType.COMPLEX_CNN,
+    "mnist_compressed_cnn": MNISTModelType.COMPRESSED_CNN,
     "decision_tree": MNISTModelType.DECISION_TREE,
     "resnet_preact": MNISTModelType.RESNET_PREACT,
 }
@@ -71,8 +71,8 @@ def load_mnist_model(model_type: MNISTModelType) -> torch.nn.Module:
     if model_type == MNISTModelType.SIMPLE_CNN:
         from src.mnist_models.mnist_simple_cnn import MNISTCNN as M
         model = M()
-    elif model_type == MNISTModelType.COMPLEX_CNN:
-        from src.mnist_models.mnist_complex_cnn import MNISTNet1 as M
+    elif model_type == MNISTModelType.COMPRESSED_CNN:
+        from src.mnist_models.mnist_compressed_cnn import MNISTNet1 as M
         model = M()
     elif model_type == MNISTModelType.RESNET_PREACT:
         from src.mnist_models.resnet_preact import ResNetPreAct as R

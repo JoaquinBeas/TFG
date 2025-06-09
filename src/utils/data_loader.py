@@ -68,50 +68,50 @@ def get_synthetic_mnist_dataloaders(
                               num_workers=num_workers)
     test_loader = DataLoader(test_ds,
                              batch_size=batch_size,
-                             shuffle=False,
+                             shuffle=True,
                              num_workers=num_workers)
 
     return train_loader, test_loader
 
-def get_all_synthetic_dataloaders(
-    base_dir: str = SAVE_SYNTHETIC_DATASET_DIR,
-    batch_size: int = BATCH_SIZE,
-    img_size: int = IMAGE_SIZE,
-    num_workers: int = NUM_WORKERS,
-):
-    """
-    Devuelve un dict {nombre_dataset: (train_loader, val_loader)} para cada
-    subcarpeta que contenga los ficheros IDX necesarios.
-    """
-    loaders = {}
-    base = Path(base_dir)
-    if not base.exists():
-        raise FileNotFoundError(f"No se encontró la carpeta {base_dir}")
+# def get_all_synthetic_dataloaders(
+#     base_dir: str = SAVE_SYNTHETIC_DATASET_DIR,
+#     batch_size: int = BATCH_SIZE,
+#     img_size: int = IMAGE_SIZE,
+#     num_workers: int = NUM_WORKERS,
+# ):
+#     """
+#     Devuelve un dict {nombre_dataset: (train_loader, val_loader)} para cada
+#     subcarpeta que contenga los ficheros IDX necesarios.
+#     """
+#     loaders = {}
+#     base = Path(base_dir)
+#     if not base.exists():
+#         raise FileNotFoundError(f"No se encontró la carpeta {base_dir}")
 
-    for sub in base.iterdir():
-        if (
-            sub.is_dir()
-            and (sub / "train-images-idx3-ubyte.gz").exists()
-            and (sub / "train-labels-idx1-ubyte.gz").exists()
-        ):
-            tl, vl = get_synthetic_mnist_dataloaders(
-                batch_size=batch_size,
-                image_size=img_size,
-                num_workers=num_workers,
-                synthetic_data_dir=str(sub),
-            )
-            loaders[sub.name] = (tl, vl)
+#     for sub in base.iterdir():
+#         if (
+#             sub.is_dir()
+#             and (sub / "train-images-idx3-ubyte.gz").exists()
+#             and (sub / "train-labels-idx1-ubyte.gz").exists()
+#         ):
+#             tl, vl = get_synthetic_mnist_dataloaders(
+#                 batch_size=batch_size,
+#                 image_size=img_size,
+#                 num_workers=num_workers,
+#                 synthetic_data_dir=str(sub),
+#             )
+#             loaders[sub.name] = (tl, vl)
 
-    return loaders
+#     return loaders
 
-def get_mnist_prototypes():
-    transform = transforms.Compose([transforms.ToTensor()])
-    dataset = MNIST(root=MNIST_DATA_LOADERS_DIR, train=True, download=True, transform=transform)
-    prototypes = torch.zeros((10, 1, 28, 28))
-    counts = torch.zeros(10)
-    for image, label in dataset:
-        prototypes[label] += image
-        counts[label] += 1
-    counts[counts == 0] = 1
-    prototypes /= counts.view(-1, 1, 1, 1)
-    return prototypes
+# def get_mnist_prototypes():
+#     transform = transforms.Compose([transforms.ToTensor()])
+#     dataset = MNIST(root=MNIST_DATA_LOADERS_DIR, train=True, download=True, transform=transform)
+#     prototypes = torch.zeros((10, 1, 28, 28))
+#     counts = torch.zeros(10)
+#     for image, label in dataset:
+#         prototypes[label] += image
+#         counts[label] += 1
+#     counts[counts == 0] = 1
+#     prototypes /= counts.view(-1, 1, 1, 1)
+#     return prototypes

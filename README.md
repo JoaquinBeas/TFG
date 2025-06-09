@@ -4,12 +4,11 @@
 
 ## Descripció
 
-Aquest projecte implementa un pipeline de *distil·lació de coneixement* basat en dades sintètiques generades per un model de difusió entrenat sobre el conjunt de dades MNIST. El flux de treball és el següent:
+Aquest projecte implementa un pipeline de *replicació de coneixement* basat en dades sintètiques generades per un model de difusió entrenat sobre el conjunt de dades MNIST. El flux de treball és el següent:
 
 1. Entrenar un **model teacher** (classificador MNIST) utilitzant el conjunt de dades MNIST original.
-2. Entrenar un **model de difusió** per aprendre a eliminar soroll de les imatges de MNIST.
+2. Entrenar un **model de difusió** per aprendre a generar imatges de MNIST a partir de soroll.
 3. Generar un **dataset sintètic amb etiquetes**:
-
    * Mostrejar imatges amb soroll utilitzant el model de difusió.
    * Predir les seves etiquetes mitjançant el model teacher.
 4. Entrenar un **model student** (classificador MNIST) utilitzant el dataset sintètic generat.

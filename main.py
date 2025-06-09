@@ -100,13 +100,6 @@ def load_mnist_model(model_type: MNISTModelType) -> torch.nn.Module:
 
 
 def load_diffusion_model(model_type: DiffusionModelType) -> torch.nn.Module:
-    # Instantiate architecture
-    # if model_type == DiffusionModelType.GUIDED_UNET:
-    #     from src.diffusion_models.diffusion_guided_unet import DiffusionGuidedUnet as D
-    #     model = D()
-    # elif model_type == DiffusionModelType.RESNET:
-    #     from src.diffusion_models.diffusion_resnet import DiffusionResnet as R
-    #     model = R()
     if model_type == DiffusionModelType.UNET:
         from src.diffusion_models.diffusion_unet import DiffusionUnet as U
         model = U(MODEL_IMAGE_SIZE, MODEL_IN_CHANNELS, TIMESTEPS)
@@ -171,9 +164,38 @@ def main():
                                 use_synthetic_dataset=True)
         loss, acc = trainer.train_model()
         logger.info(f"Student loss={loss:.4f}, acc={acc:.2f}%")
+        student_model = trainer.get_model()
     else:
         logger.info("Loading MNIST student...")
         student_model = load_mnist_model(student_type)
+
+    logger.info("Evaluando student model en test-MNIST original")
+    eval_trainer = MnistTrainer(
+        model_type=student_type,
+        num_epochs=1,
+        learning_rate=0.0,
+        batch_size=64
+    )
+    eval_trainer.model = student_model
+    eval_trainer.model.to(DEVICE)
+    _, acc_student_mnist = eval_trainer.evaluate_on_loader(
+        eval_trainer.test_loader,
+        loader_name="MNIST-Test"
+    )
+    logger.info(f"Student model accuracy on MNIST test: {acc_student_mnist:.2f}%")
+
+
+def evaluate_accuracy(model, loader, device) -> float:
+    model.eval()
+    correct, total = 0, 0
+    with torch.no_grad():
+        for x, y in loader:
+            x, y = x.to(device), y.to(device)
+            preds = model(x).argmax(dim=1)
+            correct += (preds == y).sum().item()
+            total += y.size(0)
+    return 100.0 * correct / total
+
 
 if __name__ == "__main__":
     main()
